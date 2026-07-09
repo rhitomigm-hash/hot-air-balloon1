@@ -118,29 +118,155 @@ addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
 });
 
+// 編みかご風テクスチャ(Canvasで生成。横方向の籐の束を段違いに重ねた見た目)
+function buildWickerTexture() {
+  const cv = document.createElement('canvas');
+  cv.width = 128;
+  cv.height = 128;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#5d451f';
+  ctx.fillRect(0, 0, 128, 128);
+  const rowH = 16, segW = 32;
+  for (let y = 0, r = 0; y < 128; y += rowH, r++) {
+    const off = (r % 2) * (segW / 2);
+    for (let x = -segW; x < 128 + segW; x += segW) {
+      const grad = ctx.createLinearGradient(0, y, 0, y + rowH);
+      grad.addColorStop(0, '#8a6a3c');
+      grad.addColorStop(0.45, '#b28a54');
+      grad.addColorStop(1, '#6d5127');
+      ctx.fillStyle = grad;
+      ctx.fillRect(x + off + 1, y + 1, segW - 2, rowH - 2);
+    }
+  }
+  const tex = new THREE.CanvasTexture(cv);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+// ゴア(縦の縫い目パネル)模様のテクスチャ。bright=true は内面用の明るい配色
+function buildGoreTexture(bright) {
+  const cv = document.createElement('canvas');
+  cv.width = 512;
+  cv.height = 64;
+  const ctx = cv.getContext('2d');
+  const gores = 16, w = 512 / gores;
+  const cols = bright ? ['#e0584a', '#c94434'] : ['#c62828', '#a81f1f'];
+  const seam = bright ? '#a83028' : '#7a1515';
+  for (let i = 0; i < gores; i++) {
+    ctx.fillStyle = cols[i % 2];
+    ctx.fillRect(i * w, 0, w, 64);
+    ctx.fillStyle = seam;
+    ctx.fillRect(i * w, 0, 2, 64);
+  }
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 // ---- 気球(プレースホルダ形状) ----
+const BASKET_W = 1.4, BASKET_H = 1.1, WALL_T = 0.06, BURNER_Y = 2.0;
 function buildBalloon() {
   const g = new THREE.Group(); // 原点 = バスケット底面(接地点)
-  const envMat = new THREE.MeshLambertMaterial({ color: 0xc62828 });
+  const envMat = new THREE.MeshLambertMaterial({ map: buildGoreTexture(false) });
   const env = new THREE.Mesh(new THREE.SphereGeometry(9, 24, 18), envMat);
   env.scale.set(1, 1.12, 1);
   env.position.y = 16.5;
   g.add(env);
-  const basket = new THREE.Mesh(
-    new THREE.BoxGeometry(1.4, 1.1, 1.4),
-    new THREE.MeshLambertMaterial({ color: 0x6d4c2f }));
-  basket.position.y = 0.55;
-  g.add(basket);
-  const flame = new THREE.Mesh(
-    new THREE.ConeGeometry(0.5, 1.8, 8),
-    new THREE.MeshBasicMaterial({ color: 0xffa726, transparent: true, opacity: 0.9 }));
-  flame.position.y = 2.2;
+  // 球皮の内面(見上げたときに見える側)。日光が透けた明るい布として自発光風に描く
+  const envInnerMat = new THREE.MeshBasicMaterial({
+    map: buildGoreTexture(true), side: THREE.BackSide,
+  });
+  const envInner = new THREE.Mesh(new THREE.SphereGeometry(8.8, 24, 18), envInnerMat);
+  envInner.scale.set(1, 1.12, 1);
+  envInner.position.y = 16.5;
+  g.add(envInner);
+
+  // スカート(球皮の口からバーナー上方へ絞る布)。上端半径3.0は球皮の
+  // y=7.0における断面半径と一致させ、継ぎ目が浮かないようにしている
+  const skirt = new THREE.Mesh(
+    new THREE.CylinderGeometry(3.0, 1.5, 3.2, 20, 1, true),
+    new THREE.MeshLambertMaterial({ color: 0xb52a2a, side: THREE.DoubleSide }));
+  skirt.position.y = 5.4;
+  g.add(skirt);
+
+  // 四角い編みかごのゴンドラ(4面の壁+床。内側からも見えるようDoubleSide)
+  const wicker = buildWickerTexture();
+  wicker.repeat.set(3, 3);
+  const wickerMat = new THREE.MeshLambertMaterial({ map: wicker, side: THREE.DoubleSide });
+  const half = BASKET_W / 2 - WALL_T / 2;
+  for (const [w, d, x, z] of [
+    [BASKET_W, WALL_T, 0, half], [BASKET_W, WALL_T, 0, -half],   // 前後の壁
+    [WALL_T, BASKET_W, half, 0], [WALL_T, BASKET_W, -half, 0],   // 左右の壁
+  ]) {
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(w, BASKET_H, d), wickerMat);
+    wall.position.set(x, BASKET_H / 2, z);
+    g.add(wall);
+  }
+  const floor = new THREE.Mesh(
+    new THREE.BoxGeometry(BASKET_W, WALL_T, BASKET_W),
+    new THREE.MeshLambertMaterial({ color: 0x4a3620 }));
+  floor.position.y = WALL_T / 2;
+  g.add(floor);
+
+  // 上縁の革張りリム(4辺の横棒。壁の上面を覆って縞の露出を隠す)
+  const rimMat = new THREE.MeshLambertMaterial({ color: 0x3e2b18 });
+  for (const [len, rot, x, z] of [
+    [BASKET_W + 0.14, 0, 0, half], [BASKET_W + 0.14, 0, 0, -half],
+    [BASKET_W + 0.14, Math.PI / 2, half, 0], [BASKET_W + 0.14, Math.PI / 2, -half, 0],
+  ]) {
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, len, 10), rimMat);
+    rim.rotation.z = Math.PI / 2;
+    rim.rotation.y = rot;
+    rim.position.set(x, BASKET_H, z);
+    g.add(rim);
+  }
+
+  // 四隅の支柱(革巻き風。バスケット上縁→スカート裾まで)+バーナー本体
+  const POLE_TOP = 3.9; // スカート裾(y=3.8)に届く高さ
+  const poleMat = new THREE.MeshLambertMaterial({ color: 0x5c3a26 });
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) {
+      const pole = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.03, 0.03, POLE_TOP - BASKET_H, 6), poleMat);
+      pole.position.set(sx * (half - 0.05), (POLE_TOP + BASKET_H) / 2, sz * (half - 0.05));
+      g.add(pole);
+    }
+  }
+  const burnerUnit = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.26, 0.26, 0.32, 10),
+    new THREE.MeshLambertMaterial({ color: 0x555555 }));
+  burnerUnit.position.y = BURNER_Y;
+  g.add(burnerUnit);
+
+  // リップライン(ゴンドラから気球の口まで伸びる赤いロープ)
+  const ropeBaseY = 4.5; // 中心y。長さ5.2でおよそ y=1.9〜7.1
+  const rope = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.015, 0.015, 5.2, 6),
+    new THREE.MeshBasicMaterial({ color: 0xd32f2f }));
+  rope.position.set(0.3, ropeBaseY, 0.3);
+  g.add(rope);
+
+  // バーナー炎(外側オレンジ+芯の黄色の二重コーン)。バーナー上端から上へ吹き上がる。
+  // 底面なし(openEnded)にして、ゴンドラから見上げたときも自然に見えるようにする
+  const flame = new THREE.Group();
+  const flameMatOpts = { transparent: true, side: THREE.DoubleSide };
+  const flameOuter = new THREE.Mesh(
+    new THREE.ConeGeometry(0.35, 1.8, 8, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0xff8a30, opacity: 0.85, ...flameMatOpts }));
+  flame.add(flameOuter);
+  const flameCore = new THREE.Mesh(
+    new THREE.ConeGeometry(0.16, 1.2, 8, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0xffe082, opacity: 0.95, ...flameMatOpts }));
+  flameCore.position.y = -0.25;
+  flame.add(flameCore);
+  flame.position.y = BURNER_Y + 1.3; // 基部 y≈2.4 からバーナー上方へ吹き上がる
   flame.visible = false;
   g.add(flame);
   const flameLight = new THREE.PointLight(0xffa040, 0, 60);
-  flameLight.position.y = 3;
+  flameLight.position.y = BURNER_Y + 1.1;
   g.add(flameLight);
-  return { group: g, flame, flameLight };
+  return { group: g, flame, flameLight, envInnerMat, rope, ropeBaseY };
 }
 
 // ---- JDGターゲット(オレンジのX+白リング) ----
@@ -161,7 +287,7 @@ function buildTarget(x, z, groundY) {
   return g;
 }
 
-// ---- マーカー(重り+リボン) ----
+// ---- マーカー(重り+リボン+視認用グロー) ----
 function buildMarkerMesh() {
   const g = new THREE.Group();
   const weight = new THREE.Mesh(
@@ -169,11 +295,76 @@ function buildMarkerMesh() {
     new THREE.MeshLambertMaterial({ color: 0xd32f2f }));
   g.add(weight);
   const ribbon = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.4, 3.5),
+    new THREE.PlaneGeometry(0.5, 4.5),
     new THREE.MeshBasicMaterial({ color: 0xffee58, side: THREE.DoubleSide }));
-  ribbon.position.y = 2.1;
+  ribbon.position.y = 2.6;
   g.add(ribbon);
+  // 落下中でも見失わないよう、常にカメラを向く淡い光のスプライトを重ねる
+  const spCv = document.createElement('canvas');
+  spCv.width = spCv.height = 64;
+  const sctx = spCv.getContext('2d');
+  const grad = sctx.createRadialGradient(32, 32, 4, 32, 32, 30);
+  grad.addColorStop(0, 'rgba(255,235,80,0.85)');
+  grad.addColorStop(1, 'rgba(255,235,80,0)');
+  sctx.fillStyle = grad;
+  sctx.fillRect(0, 0, 64, 64);
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: new THREE.CanvasTexture(spCv), transparent: true, depthWrite: false,
+  }));
+  glow.scale.set(3, 3, 1);
+  g.add(glow);
   return g;
+}
+
+// ---- サウンド(Web Audio合成、外部ファイル不要) ----
+// ブラウザの自動再生制限があるため、初回のユーザー操作で初期化し、
+// suspended のままなら操作のたびに resume する(前回鳴らなかった原因への対処)
+let audioCtx = null, burnerGain = null, ripGain = null, windGain = null;
+let sndBurnerOn = false, sndRipOn = false;
+
+function ensureAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const noise = audioCtx.createBuffer(1, audioCtx.sampleRate * 2, audioCtx.sampleRate);
+    const d = noise.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const makeLoop = (type, freq, q) => {
+      const src = audioCtx.createBufferSource();
+      src.buffer = noise;
+      src.loop = true;
+      const filter = audioCtx.createBiquadFilter();
+      filter.type = type;
+      filter.frequency.value = freq;
+      filter.Q.value = q;
+      const gainNode = audioCtx.createGain();
+      gainNode.gain.value = 0;
+      src.connect(filter).connect(gainNode).connect(audioCtx.destination);
+      src.start();
+      return gainNode;
+    };
+    burnerGain = makeLoop('bandpass', 600, 0.6);   // バーナーの噴射音(ゴーッ)
+    ripGain = makeLoop('bandpass', 2600, 0.9);     // リップラインの排気音(シューッ)
+    windGain = makeLoop('lowpass', 380, 0.4);      // 風のアンビエント
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+addEventListener('keydown', ensureAudio);
+addEventListener('pointerdown', ensureAudio);
+
+// 毎フレーム呼ばれ、入力状態・風速に音量を追従させる
+function updateSounds(windKt) {
+  if (!audioCtx || audioCtx.state !== 'running') return;
+  const t = audioCtx.currentTime;
+  const bOn = input.burner && state.fuel > 0;
+  if (bOn !== sndBurnerOn) {
+    sndBurnerOn = bOn;
+    burnerGain.gain.setTargetAtTime(bOn ? 0.4 : 0, t, bOn ? 0.04 : 0.18);
+  }
+  if (input.rip !== sndRipOn) {
+    sndRipOn = input.rip;
+    ripGain.gain.setTargetAtTime(input.rip ? 0.25 : 0, t, input.rip ? 0.04 : 0.12);
+  }
+  windGain.gain.setTargetAtTime(THREE.MathUtils.clamp(windKt / 40, 0, 1) * 0.15, t, 0.4);
 }
 
 // ---- 入力 ----
@@ -801,6 +992,7 @@ function stepMarker(dt) {
   }
   marker.mesh.position.copy(m.pos);
   marker.mesh.rotation.y += 2 * dt; // リボンの回転(演出)
+  document.getElementById('marker-info').textContent = `落下中 ${Math.round(m.pos.y - ground)}m`;
 }
 
 function onMarkerLanded(pos) {
@@ -994,15 +1186,26 @@ applyViewMode();
 const prevPos = state.pos.clone();
 const clock = new THREE.Clock();
 let lastDetailCheck = 0;
+let envGlow = 0;  // バーナー点火時の球皮内面の明るさ(0..1、滑らかに追従)
+let ripPull = 0;  // リップラインを引いた量(0..1、滑らかに追従)
 
 // デバッグ用: ?autostart=1 でブリーフィングを飛ばして即離陸(自動テスト向け)。
 // ?fpv=1 を併用するとゴンドラ視点で開始(視点確認用)
 if (new URLSearchParams(location.search).has('autostart')) {
+  const dbgParams = new URLSearchParams(location.search);
   startFlight(800, 1800);
-  if (new URLSearchParams(location.search).has('fpv')) {
+  if (dbgParams.has('fpv')) {
     fpv = true;
     applyViewMode();
+    const pitchDeg = Number(dbgParams.get('pitch'));
+    if (Number.isFinite(pitchDeg)) {
+      fpvPitch = THREE.MathUtils.clamp(
+        THREE.MathUtils.degToRad(pitchDeg), -PITCH_LIMIT, PITCH_LIMIT);
+    }
+    const yawDeg = Number(dbgParams.get('yaw'));
+    if (Number.isFinite(yawDeg)) fpvYaw = THREE.MathUtils.degToRad(yawDeg);
   }
+  if (dbgParams.has('burn')) input.burner = true; // 炎・内面グロー確認用
 }
 
 renderer.setAnimationLoop(() => {
@@ -1012,14 +1215,25 @@ renderer.setAnimationLoop(() => {
     const w = stepPhysics(dt);
     stepMarker(dt);
     stepClock(dt);
+    updateSounds(w.kt);
 
     balloon.group.position.copy(state.pos);
     balloon.flame.visible = input.burner && state.fuel > 0;
     balloon.flameLight.intensity = balloon.flame.visible ? 40 : 0;
 
+    // バーナー点火で球皮内面がふわっと暖色に明るくなる(点滅ではなく滑らかな変化)
+    const glowTarget = balloon.flame.visible ? 1 : 0;
+    envGlow += (glowTarget - envGlow) * Math.min(1, dt * 2.5);
+    balloon.envInnerMat.color.setRGB(1 + 0.3 * envGlow, 1 + 0.12 * envGlow, 1);
+    // リップラインを引いている間はロープが引き下がる
+    const pullTarget = input.rip ? 1 : 0;
+    ripPull += (pullTarget - ripPull) * Math.min(1, dt * 6);
+    balloon.rope.position.y = balloon.ropeBaseY - 0.18 * ripPull;
+
     if (fpv) {
-      // ゴンドラ視点: 目の位置は気球に固定し、視線方向だけドラッグで回す
-      camera.position.set(state.pos.x, state.pos.y + EYE_HEIGHT, state.pos.z);
+      // ゴンドラ視点: 目の位置は気球に固定し、視線方向だけドラッグで回す。
+      // 立ち位置は中心から少し横(実機のパイロット位置。真上の炎が正しく見える)
+      camera.position.set(state.pos.x - 0.45, state.pos.y + EYE_HEIGHT, state.pos.z);
       const cy = Math.cos(fpvPitch), sy = Math.sin(fpvPitch);
       const dir = new THREE.Vector3(Math.sin(fpvYaw) * cy, sy, -Math.cos(fpvYaw) * cy);
       camera.lookAt(camera.position.x + dir.x, camera.position.y + dir.y, camera.position.z + dir.z);
