@@ -348,6 +348,7 @@ function buildMarkerMesh() {
 // suspended のままなら操作のたびに resume する(前回鳴らなかった原因への対処)
 let audioCtx = null, masterGain = null, burnerGain = null, ripGain = null, windGain = null;
 let sndBurnerOn = false, sndRipOn = false;
+let silentUnlock = null; // iOS対策: 無音の<audio>ループでオーディオセッションを有効化する
 
 // サウンドのオン/オフ設定(localStorageに保存)。マスターゲインで一括ミュートする
 const SOUND_KEY = 'balloon-sound';
@@ -379,11 +380,24 @@ function ensureAudio() {
     burnerGain = makeLoop('bandpass', 600, 0.6);   // バーナーの噴射音(ゴーッ)
     ripGain = makeLoop('bandpass', 2600, 0.9);     // リップラインの排気音(シューッ)
     windGain = makeLoop('lowpass', 380, 0.4);      // 風のアンビエント
+    // 状態が変わったらボタン表示を更新(iOSの割り込み等で止まったことが分かるように)
+    audioCtx.onstatechange = () => renderSoundBtn();
   }
-  if (audioCtx.state === 'suspended') audioCtx.resume();
+  // iOSはWeb Audio単体だと鳴らないことがあるため、ユーザー操作中に
+  // 無音の<audio>をループ再生してオーディオセッションを確立する
+  if (!silentUnlock) {
+    silentUnlock = document.createElement('audio');
+    silentUnlock.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+    silentUnlock.loop = true;
+    silentUnlock.play().catch(() => { silentUnlock = null; }); // 失敗したら次の操作で再試行
+  }
+  if (audioCtx.state !== 'running') audioCtx.resume().then(() => renderSoundBtn());
+  renderSoundBtn();
 }
 addEventListener('keydown', ensureAudio);
 addEventListener('pointerdown', ensureAudio);
+addEventListener('touchend', ensureAudio); // 古いiOSはtouchend契機でしかresumeできない
+addEventListener('click', ensureAudio);
 
 // 毎フレーム呼ばれ、入力状態・風速に音量を追従させる
 function updateSounds(windKt) {
@@ -481,7 +495,11 @@ document.getElementById('btn-pibal').addEventListener('click', togglePibal);
 
 // サウンドのオン/オフ切替ボタン
 const soundBtn = document.getElementById('btn-sound');
-const renderSoundBtn = () => { soundBtn.textContent = soundOn ? '音 ON' : '音 OFF'; };
+// 「音 ON…」= ONだがオーディオが動いていない(未初期化/停止中)。原因切り分け用
+const renderSoundBtn = () => {
+  const stalled = !audioCtx || audioCtx.state !== 'running';
+  soundBtn.textContent = soundOn ? (stalled ? '音 ON…' : '音 ON') : '音 OFF';
+};
 renderSoundBtn();
 soundBtn.addEventListener('click', () => {
   soundOn = !soundOn;
