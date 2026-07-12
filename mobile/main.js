@@ -28,7 +28,7 @@ function decodeArea(s) {
   return { lon, lat };
 }
 
-// パイバル観測データ。高度ft(MSL) / 風向FROM 磁方位° / 風速kt
+// パイバル観測データ。高度ft(対地=AGL) / 風向FROM 磁方位° / 風速kt
 const WIND_PRESETS = [
   { name: '佐賀・朝の順転(既定)',
     rows: [[0, 140, 3], [500, 160, 5], [1000, 190, 7], [2000, 220, 10], [3000, 240, 13], [5000, 260, 17]] },
@@ -70,8 +70,11 @@ const MARKER_TERMINAL = 10;              // 終端速度 m/s
 const MARKER_DRAG = 9.81 / MARKER_TERMINAL;
 const MARKER_WIND_TAU = 1.5;             // 水平速度が風に馴染む時定数 s
 
-function windAt(altM) {
-  const ft = altM * M2FT;
+// 風テーブルの高度は対地(AGL)基準。MSL基準だと標高の高いエリアで
+// 低高度レイヤーが地面より下になり使えなくなるため、その地点の地表からの高さで引く
+function windAt(x, z, altM) {
+  const agl = Math.max(0, altM - terrain.getHeight(x, z));
+  const ft = agl * M2FT;
   let a = PIBAL[0], b = PIBAL[PIBAL.length - 1];
   if (ft <= a.ft) b = a;
   else if (ft >= b.ft) a = b;
@@ -269,6 +272,30 @@ function buildBalloon() {
   return { group: g, flame, flameLight, envInnerMat, rope, ropeBaseY };
 }
 
+// ---- 気球の擬似影 ----
+// 真下の地面に置く円形の暗がり。対地高度が上がるほど大きく・薄くなり、
+// 高さの目安になる(ライトのシャドウマップより軽く、広域地形でも破綻しない)
+function buildShadowMesh() {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 128;
+  const ctx = cv.getContext('2d');
+  const grad = ctx.createRadialGradient(64, 64, 10, 64, 64, 62);
+  grad.addColorStop(0, 'rgba(0,0,0,0.9)');
+  grad.addColorStop(0.65, 'rgba(0,0,0,0.55)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 128, 128);
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(1, 1),
+    new THREE.MeshBasicMaterial({
+      map: new THREE.CanvasTexture(cv),
+      transparent: true, depthWrite: false, opacity: 0.55,
+    }));
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.renderOrder = 1; // 地形の上に重ねて描く
+  return mesh;
+}
+
 // ---- JDGターゲット(オレンジのX+白リング) ----
 function buildTarget(x, z, groundY) {
   const g = new THREE.Group();
@@ -319,12 +346,20 @@ function buildMarkerMesh() {
 // ---- サウンド(Web Audio合成、外部ファイル不要) ----
 // ブラウザの自動再生制限があるため、初回のユーザー操作で初期化し、
 // suspended のままなら操作のたびに resume する(前回鳴らなかった原因への対処)
-let audioCtx = null, burnerGain = null, ripGain = null, windGain = null;
+let audioCtx = null, masterGain = null, burnerGain = null, ripGain = null, windGain = null;
 let sndBurnerOn = false, sndRipOn = false;
+let silentUnlock = null; // iOS対策: 無音の<audio>ループでオーディオセッションを有効化する
+
+// サウンドのオン/オフ設定(localStorageに保存)。マスターゲインで一括ミュートする
+const SOUND_KEY = 'balloon-sound';
+let soundOn = localStorage.getItem(SOUND_KEY) !== 'off';
 
 function ensureAudio() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = soundOn ? 1 : 0;
+    masterGain.connect(audioCtx.destination);
     const noise = audioCtx.createBuffer(1, audioCtx.sampleRate * 2, audioCtx.sampleRate);
     const d = noise.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
@@ -338,18 +373,31 @@ function ensureAudio() {
       filter.Q.value = q;
       const gainNode = audioCtx.createGain();
       gainNode.gain.value = 0;
-      src.connect(filter).connect(gainNode).connect(audioCtx.destination);
+      src.connect(filter).connect(gainNode).connect(masterGain);
       src.start();
       return gainNode;
     };
     burnerGain = makeLoop('bandpass', 600, 0.6);   // バーナーの噴射音(ゴーッ)
     ripGain = makeLoop('bandpass', 2600, 0.9);     // リップラインの排気音(シューッ)
     windGain = makeLoop('lowpass', 380, 0.4);      // 風のアンビエント
+    // 状態が変わったらボタン表示を更新(iOSの割り込み等で止まったことが分かるように)
+    audioCtx.onstatechange = () => renderSoundBtn();
   }
-  if (audioCtx.state === 'suspended') audioCtx.resume();
+  // iOSはWeb Audio単体だと鳴らないことがあるため、ユーザー操作中に
+  // 無音の<audio>をループ再生してオーディオセッションを確立する
+  if (!silentUnlock) {
+    silentUnlock = document.createElement('audio');
+    silentUnlock.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+    silentUnlock.loop = true;
+    silentUnlock.play().catch(() => { silentUnlock = null; }); // 失敗したら次の操作で再試行
+  }
+  if (audioCtx.state !== 'running') audioCtx.resume().then(() => renderSoundBtn());
+  renderSoundBtn();
 }
 addEventListener('keydown', ensureAudio);
 addEventListener('pointerdown', ensureAudio);
+addEventListener('touchend', ensureAudio); // 古いiOSはtouchend契機でしかresumeできない
+addEventListener('click', ensureAudio);
 
 // 毎フレーム呼ばれ、入力状態・風速に音量を追従させる
 function updateSounds(windKt) {
@@ -444,6 +492,29 @@ document.getElementById('btn-speed').addEventListener('click', () => {
   setTimeScale(order[(order.indexOf(timeScale) + 1) % order.length]);
 });
 document.getElementById('btn-pibal').addEventListener('click', togglePibal);
+
+// サウンドのオン/オフ切替ボタン
+const soundBtn = document.getElementById('btn-sound');
+// 「音 ON…」= ONだがオーディオが動いていない(未初期化/停止中)。原因切り分け用
+const renderSoundBtn = () => {
+  const stalled = !audioCtx || audioCtx.state !== 'running';
+  soundBtn.textContent = soundOn ? (stalled ? '音 ON…' : '音 ON') : '音 OFF';
+};
+renderSoundBtn();
+soundBtn.addEventListener('click', () => {
+  soundOn = !soundOn;
+  localStorage.setItem(SOUND_KEY, soundOn ? 'on' : 'off');
+  ensureAudio(); // ボタン操作はユーザージェスチャなのでここでresumeも通る
+  masterGain.gain.setTargetAtTime(soundOn ? 1 : 0, audioCtx.currentTime, 0.05);
+  renderSoundBtn();
+});
+
+// 計器パネルはスマホでは既定コンパクト(必須計器のみ)。タップで詳細行を開閉する
+const instrumentsEl = document.getElementById('instruments');
+instrumentsEl.addEventListener('click', () => {
+  const compact = instrumentsEl.classList.toggle('compact');
+  document.getElementById('hud-toggle').textContent = compact ? 'タップで詳細 ▾' : '閉じる ▴';
+});
 
 // ゴンドラ視点でのルック操作(マウス/タッチ共通。ドラッグで視線方向を回転、目の位置は動かさない)
 renderer.domElement.addEventListener('pointerdown', (e) => {
@@ -949,6 +1020,18 @@ function startFlight(x, z) {
 
 const balloon = buildBalloon();
 scene.add(balloon.group);
+const balloonShadow = buildShadowMesh();
+scene.add(balloonShadow);
+
+// 毎フレーム: 影を気球直下の地面に置き、対地高度でサイズと濃さを変える
+function updateShadow() {
+  const groundY = terrain.getHeight(state.pos.x, state.pos.z);
+  const agl = Math.max(0, state.pos.y - groundY);
+  balloonShadow.position.set(state.pos.x, groundY + 0.8, state.pos.z);
+  const size = Math.min(19 + agl * 0.05, 60); // 球皮直径≒18mを基準に高いほどぼやけて拡大
+  balloonShadow.scale.set(size, size, 1);
+  balloonShadow.material.opacity = Math.max(0.07, 0.55 * 300 / (300 + agl));
+}
 
 const targetGroundY = terrain.getHeight(TARGET_XZ.x, TARGET_XZ.z);
 const target = buildTarget(TARGET_XZ.x, TARGET_XZ.z, targetGroundY);
@@ -960,7 +1043,7 @@ const marker = { available: 1, state: null, mesh: null };
 function dropMarker() {
   if (marker.available <= 0 || state.grounded || expired) return;
   marker.available = 0;
-  const w = windAt(state.pos.y);
+  const w = windAt(state.pos.x, state.pos.z, state.pos.y);
   marker.state = {
     pos: state.pos.clone().add(new THREE.Vector3(0, 0.8, 0)),
     vel: new THREE.Vector3(w.vx, state.vy, w.vz), // 気球(=風)の速度を引き継ぐ
@@ -975,7 +1058,7 @@ function dropMarker() {
 function stepMarker(dt) {
   const m = marker.state;
   if (!m || m.landed) return;
-  const w = windAt(m.pos.y);
+  const w = windAt(m.pos.x, m.pos.z, m.pos.y);
   // 鉛直: 重力+空気抵抗(終端速度 MARKER_TERMINAL)/ 水平: 風に漸近
   m.vel.y += (-9.81 - MARKER_DRAG * m.vel.y) * dt;
   m.vel.x += ((w.vx - m.vel.x) / MARKER_WIND_TAU) * dt;
@@ -1063,7 +1146,7 @@ function stepPhysics(dt) {
   state.vy += acc * dt;
   state.pos.y += state.vy * dt;
 
-  const w = windAt(state.pos.y);
+  const w = windAt(state.pos.x, state.pos.z, state.pos.y);
   if (!state.grounded) {
     state.pos.x += w.vx * dt;
     state.pos.z += w.vz * dt;
@@ -1159,7 +1242,8 @@ const hud = {
 };
 function updateHud(w) {
   const ground = terrain.getHeight(state.pos.x, state.pos.z);
-  hud.altFt.textContent = Math.round(state.pos.y * M2FT);
+  // 大きな高度表示は対地ft(パイバル表と同じ基準で風を読めるように)
+  hud.altFt.textContent = Math.round((state.pos.y - ground) * M2FT);
   hud.altM.textContent = Math.round(state.pos.y);
   hud.agl.textContent = Math.round(state.pos.y - ground);
   hud.vario.textContent = (state.vy >= 0 ? '+' : '') + state.vy.toFixed(1);
@@ -1218,6 +1302,7 @@ renderer.setAnimationLoop(() => {
     updateSounds(w.kt);
 
     balloon.group.position.copy(state.pos);
+    updateShadow();
     balloon.flame.visible = input.burner && state.fuel > 0;
     balloon.flameLight.intensity = balloon.flame.visible ? 40 : 0;
 

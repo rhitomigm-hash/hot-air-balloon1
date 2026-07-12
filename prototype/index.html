@@ -38,6 +38,20 @@
     background: #2e6da4; color: #fff; font-size: 14px; cursor: pointer;
   }
   #result button:hover { background: #3a80bd; }
+  #result .r-support {
+    margin-top: 16px; padding-top: 14px; border-top: 1px solid #345a7a;
+    text-align: left; max-width: 300px;
+  }
+  #result .r-support .s-title { font-size: 14px; color: #ffd54f; font-weight: bold; margin-bottom: 6px; }
+  #result .r-support .s-text { font-size: 12px; color: #cdd9e4; line-height: 1.7; }
+  #result .r-support a.s-btn {
+    display: block; margin: 10px 0 8px; padding: 10px 6px; border-radius: 6px;
+    background: #d64545; color: #fff; font-size: 14px; font-weight: bold;
+    text-align: center; text-decoration: none;
+  }
+  #result .r-support a.s-btn:hover { background: #e25b5b; }
+  #result .r-support a.s-btn.insta { background: #8134af; }
+  #result .r-support a.s-btn.insta:hover { background: #9948c4; }
   #compass {
     position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%);
     width: 120px; height: 120px; border-radius: 50%;
@@ -192,6 +206,22 @@
   <div class="r-sub" id="result-sub"></div>
   <button id="result-retry">もう一度飛ぶ</button>
   <button id="result-share">条件URLをコピー</button>
+  <div class="r-support">
+    <div class="s-title">🎈 日本代表を応援しよう!</div>
+    <div class="s-text">
+      2026年9月、ポーランド🇵🇱クロスノで開催される熱気球世界選手権に、
+      日本から7名のパイロットが日本代表として出場予定です。
+    </div>
+    <a class="s-btn" href="https://docs.google.com/forms/d/e/1FAIpQLSdhAzGXCH2ZGikzn_RY3RanpaANnoMbtcZ9XlQYyfdCiSGKDA/viewform"
+       target="_blank" rel="noopener">応援Tシャツを申し込む</a>
+    <div class="s-text">
+      Tシャツは3デザイン×各2色、綿素材とドライ素材から選べます。<br>
+      ご寄付も受け付けています。ご寄付いただいた方には、世界選手権の開催地
+      クロスノの実在地形で飛べる<b>特別版アプリ</b>をお届けします。
+    </div>
+    <a class="s-btn insta" href="https://www.instagram.com/hotairballoongames2026/"
+       target="_blank" rel="noopener">寄付のご案内はInstagramへ</a>
+  </div>
 </div>
 
 <div id="pibal" class="panel">

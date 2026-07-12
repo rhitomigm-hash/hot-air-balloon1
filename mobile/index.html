@@ -18,7 +18,9 @@
   .panel .num { font-family: Consolas, monospace; }
   #instruments { top: 12px; left: 12px; min-width: 190px; }
   #instruments .alt-big { font-size: 30px; font-family: Consolas, monospace; line-height: 1.1; }
+  #instruments .alt-big .unit { font-size: 14px; color: #9ab; }
   #instruments .row { display: flex; justify-content: space-between; gap: 12px; margin-top: 4px; }
+  #instruments .hud-toggle { display: none; } /* スマホ幅でのみ表示 */
   .bar { height: 8px; border-radius: 4px; background: #223; margin-top: 2px; overflow: hidden; }
   .bar > div { height: 100%; width: 50%; }
   #fuel-fill { background: #4caf50; }
@@ -40,6 +42,20 @@
     background: #2e6da4; color: #fff; font-size: 14px; cursor: pointer;
   }
   #result button:hover { background: #3a80bd; }
+  #result .r-support {
+    margin-top: 16px; padding-top: 14px; border-top: 1px solid #345a7a;
+    text-align: left; max-width: 300px;
+  }
+  #result .r-support .s-title { font-size: 14px; color: #ffd54f; font-weight: bold; margin-bottom: 6px; }
+  #result .r-support .s-text { font-size: 12px; color: #cdd9e4; line-height: 1.7; }
+  #result .r-support a.s-btn {
+    display: block; margin: 10px 0 8px; padding: 10px 6px; border-radius: 6px;
+    background: #d64545; color: #fff; font-size: 14px; font-weight: bold;
+    text-align: center; text-decoration: none;
+  }
+  #result .r-support a.s-btn:hover { background: #e25b5b; }
+  #result .r-support a.s-btn.insta { background: #8134af; }
+  #result .r-support a.s-btn.insta:hover { background: #9948c4; }
   #compass {
     position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%);
     width: 120px; height: 120px; border-radius: 50%;
@@ -129,17 +145,19 @@
     align-items: center; justify-content: center;
   }
   .tbtn:active { background: rgba(46, 109, 164, 0.85); }
+  /* アクションボタンは右端の縦一列(右手の親指/人差し指で操作)。
+     左半分は視点ドラッグ(左親指)用に空けておく */
   #btn-burner {
-    right: 14px; bottom: 90px; width: 96px; height: 96px;
+    right: 12px; bottom: 96px; width: 104px; height: 104px;
     font-size: 17px; border-color: #ff7043; color: #ffb74d;
   }
   #btn-rip {
-    right: 14px; bottom: 200px; width: 96px; height: 64px;
+    right: 12px; bottom: 214px; width: 104px; height: 62px;
     font-size: 15px; border-color: #64b5f6; color: #90caf9;
   }
   #btn-marker {
-    left: 14px; bottom: 90px; width: 88px; height: 88px;
-    font-size: 15px; border-color: #ffd54f; color: #ffe082;
+    right: 12px; bottom: 290px; width: 104px; height: 62px;
+    font-size: 14px; border-color: #ffd54f; color: #ffe082;
   }
   #touch-tools {
     position: fixed; top: 12px; right: 12px;
@@ -153,12 +171,23 @@
 
   /* ---- スマホ向けレイアウト調整 ---- */
   @media (max-width: 760px) {
-    #instruments { min-width: 140px; font-size: 11px; padding: 8px 10px; }
+    #instruments {
+      min-width: 128px; font-size: 11px; padding: 6px 10px 8px;
+      background: rgba(10, 20, 30, 0.55); /* 気球と重なっても背後が見えるよう薄めに */
+    }
     #instruments .alt-big { font-size: 22px; }
     #instruments .row { gap: 8px; margin-top: 2px; }
+    /* 既定はコンパクト表示(必須計器のみ)。タップで詳細行を開閉し、気球との重なりを減らす */
+    #instruments.compact .detail { display: none; }
+    #instruments .hud-toggle {
+      display: block; margin-top: 5px; text-align: center;
+      font-size: 10px; color: #9ecfff;
+    }
     #pibal { display: none; } /* スマホでは「風」ボタンで開閉 */
     #help { display: none; }  /* キーボードヘルプは不要 */
-    #compass { width: 92px; height: 92px; bottom: 90px; }
+    /* 上部ツールは右上の縦一列にして計器パネルとの重なりを防ぐ */
+    #touch-tools { flex-direction: column; align-items: flex-end; gap: 6px; }
+    #compass { width: 92px; height: 92px; bottom: 14px; }
     #credit { font-size: 9px; padding: 4px 8px; }
     .b-panel { padding: 12px 14px 16px; }
     .b-title { font-size: 16px; margin-bottom: 8px; }
@@ -171,21 +200,22 @@
 <body>
 <div id="app"></div>
 
-<div id="instruments" class="panel">
-  <div class="alt-big"><span id="alt-ft">----</span> ft</div>
-  <div class="row"><span>高度(MSL)</span><span class="num"><span id="alt-m">--</span> m</span></div>
+<div id="instruments" class="panel compact">
+  <div class="alt-big"><span id="alt-ft">----</span> <span class="unit">ft 対地</span></div>
+  <div class="row detail"><span>高度(MSL)</span><span class="num"><span id="alt-m">--</span> m</span></div>
   <div class="row"><span>対地高度</span><span class="num"><span id="agl">--</span> m</span></div>
   <div class="row"><span>昇降</span><span class="num"><span id="vario">--</span> m/s</span></div>
   <div class="row"><span>風(現在高度)</span><span class="num" id="wind">---° / --kt</span></div>
-  <div class="row"><span>燃料</span><span class="num"><span id="fuel">100</span>%</span></div>
+  <div class="row detail"><span>燃料</span><span class="num"><span id="fuel">100</span>%</span></div>
   <div class="bar"><div id="fuel-fill"></div></div>
-  <div class="row"><span>エンベロープ温度</span></div>
-  <div class="bar"><div id="heat-fill"></div></div>
-  <div class="row"><span>時間加速</span><span class="num">×<span id="tscale">1</span></span></div>
-  <div class="row"><span>状態</span><span class="num" id="status">接地</span></div>
+  <div class="row detail"><span>エンベロープ温度</span></div>
+  <div class="bar detail"><div id="heat-fill"></div></div>
+  <div class="row detail"><span>時間加速</span><span class="num">×<span id="tscale">1</span></span></div>
+  <div class="row detail"><span>状態</span><span class="num" id="status">接地</span></div>
   <div class="row"><span>ターゲット</span><span class="num" id="target-info">---- m / ---°</span></div>
   <div class="row"><span>マーカー</span><span class="num" id="marker-info">残り 1</span></div>
   <div class="row"><span>残り時間</span><span class="num" id="clock">30:00</span></div>
+  <div class="hud-toggle" id="hud-toggle">タップで詳細 ▾</div>
 </div>
 
 <div id="areasel" style="display:none">
@@ -222,7 +252,7 @@
           <tbody id="wind-editor"></tbody>
         </table>
         <div class="b-hint">
-          風向はFROM(磁方位)。表は編集でき、プリセット選択・行の追加削除も可能です。<br>
+          高度は対地(AGL)、風向はFROM(磁方位)。表は編集でき、プリセット選択・行の追加削除も可能です。<br>
           ターゲットの風上側に離陸地点を取り、高度で風を乗り換えて狙いましょう。<br>
           「条件URLをコピー」で、この風と同じ条件に挑戦できるURLを共有できます。
         </div>
@@ -242,6 +272,22 @@
   <div class="r-sub" id="result-sub"></div>
   <button id="result-retry">もう一度飛ぶ</button>
   <button id="result-share">条件URLをコピー</button>
+  <div class="r-support">
+    <div class="s-title">🎈 日本代表を応援しよう!</div>
+    <div class="s-text">
+      2026年9月、ポーランド🇵🇱クロスノで開催される熱気球世界選手権に、
+      日本から7名のパイロットが日本代表として出場予定です。
+    </div>
+    <a class="s-btn" href="https://docs.google.com/forms/d/e/1FAIpQLSdhAzGXCH2ZGikzn_RY3RanpaANnoMbtcZ9XlQYyfdCiSGKDA/viewform"
+       target="_blank" rel="noopener">応援Tシャツを申し込む</a>
+    <div class="s-text">
+      Tシャツは3デザイン×各2色、綿素材とドライ素材から選べます。<br>
+      ご寄付も受け付けています。ご寄付いただいた方には、世界選手権の開催地
+      クロスノの実在地形で飛べる<b>特別版アプリ</b>をお届けします。
+    </div>
+    <a class="s-btn insta" href="https://www.instagram.com/hotairballoongames2026/"
+       target="_blank" rel="noopener">寄付のご案内はInstagramへ</a>
+  </div>
 </div>
 
 <div id="pibal" class="panel">
@@ -250,7 +296,7 @@
     <thead><tr><th>高度ft</th><th>風向°</th><th>風速kt</th></tr></thead>
     <tbody id="pibal-body"></tbody>
   </table>
-  <div class="note">高度: MSL / 風向: FROM(磁方位)<br>※磁気偏角は未考慮(プロトタイプ)</div>
+  <div class="note">高度: 対地(AGL) / 風向: FROM(磁方位)<br>※磁気偏角は未考慮(プロトタイプ)</div>
 </div>
 
 <canvas id="compass" width="150" height="150"></canvas>
@@ -262,6 +308,7 @@
   <button id="btn-view" type="button">視点</button>
   <button id="btn-speed" type="button">加速 ×<span id="tscale-btn">1</span></button>
   <button id="btn-pibal" type="button">風データ</button>
+  <button id="btn-sound" type="button">音 ON</button>
 </div>
 
 <div id="help" class="panel">
