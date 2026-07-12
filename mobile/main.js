@@ -62,6 +62,7 @@ const M2FT = 3.28084;
 
 // JDGターゲットはエリア中央。離陸地点はブリーフィングでプレイヤーが選ぶ
 const TARGET_XZ = { x: 0, z: 0 };
+let launchDist = null; // 離陸地点〜ターゲットの直線距離(m)。startFlightで確定
 const BEST_KEY = 'balloon-jdg-proto-best';
 const TASK_LIMIT_S = 30 * 60; // 制限時間(ゲーム内秒)
 
@@ -1000,6 +1001,7 @@ function startFlight(x, z) {
   // 離陸地点とターゲット周辺は先に高解像度化しておく
   terrain.requestDetail(x, z);
   terrain.requestDetail(TARGET_XZ.x, TARGET_XZ.z);
+  launchDist = Math.hypot(x - TARGET_XZ.x, z - TARGET_XZ.z);
   state.pos.set(x, terrain.getHeight(x, z), z);
   state.vy = 0;
   state.heat = 0.5;
@@ -1040,6 +1042,12 @@ scene.add(target);
 // マーカーは1本。dropped後は marker.state が物理を持つ
 const marker = { available: 1, state: null, mesh: null };
 
+// マーカーの軌跡記録(リプレイ用)。実時間(タイムスケール非依存)のタイムスタンプで記録し、
+// 再生時も実時間でなぞることで「落下にかかった実際の時間」のまま見返せるようにする
+let markerTrail = null;
+let markerTrailElapsed = 0;
+const REPLAY_DIST_THRESHOLD = 10; // この距離未満(m)ならリプレイボタンを表示
+
 function dropMarker() {
   if (marker.available <= 0 || state.grounded || expired) return;
   marker.available = 0;
@@ -1053,9 +1061,13 @@ function dropMarker() {
   marker.mesh.position.copy(marker.state.pos);
   scene.add(marker.mesh);
   document.getElementById('marker-info').textContent = '投下!';
+  markerTrailElapsed = 0;
+  // 各サンプルにその瞬間の気球位置(balloonPos)も記録し、リプレイで気球ごと再現できるようにする
+  markerTrail = [{ t: 0, pos: marker.state.pos.clone(), balloonPos: state.pos.clone() }];
 }
 
-function stepMarker(dt) {
+// rawDt: 実時間の経過秒(タイムスケールの影響を受けない)。リプレイの記録専用
+function stepMarker(dt, rawDt) {
   const m = marker.state;
   if (!m || m.landed) return;
   const w = windAt(m.pos.x, m.pos.z, m.pos.y);
@@ -1065,11 +1077,16 @@ function stepMarker(dt) {
   m.vel.z += ((w.vz - m.vel.z) / MARKER_WIND_TAU) * dt;
   m.pos.addScaledVector(m.vel, dt);
 
+  markerTrailElapsed += rawDt;
+  markerTrail.push({ t: markerTrailElapsed, pos: m.pos.clone(), balloonPos: state.pos.clone() });
+
   const ground = terrain.getHeight(m.pos.x, m.pos.z);
   if (m.pos.y <= ground) {
     m.pos.y = ground + 0.3;
     m.landed = true;
     marker.mesh.position.copy(m.pos);
+    // 着地位置を確定点として追加
+    markerTrail.push({ t: markerTrailElapsed, pos: m.pos.clone(), balloonPos: state.pos.clone() });
     onMarkerLanded(m.pos);
     return;
   }
@@ -1078,6 +1095,9 @@ function stepMarker(dt) {
   document.getElementById('marker-info').textContent = `落下中 ${Math.round(m.pos.y - ground)}m`;
 }
 
+const RESULT_SUSPENSE_MS = 3000; // 着地〜結果発表までの間(実時間。時間加速の影響を受けない)
+let measureLine = null; // 着地点→ターゲットの計測ライン。リプレイ中は着地するまで隠す
+
 function onMarkerLanded(pos) {
   const dist = Math.hypot(pos.x - TARGET_XZ.x, pos.z - TARGET_XZ.z);
   // 着地点→ターゲットの計測ライン
@@ -1085,8 +1105,10 @@ function onMarkerLanded(pos) {
     new THREE.Vector3(pos.x, pos.y + 1, pos.z),
     new THREE.Vector3(TARGET_XZ.x, targetGroundY + 1, TARGET_XZ.z),
   ]);
-  scene.add(new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0xffee58 })));
-  showResult(dist, null);
+  measureLine = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0x29e0ff }));
+  scene.add(measureLine);
+  document.getElementById('marker-info').textContent = '計測中...';
+  setTimeout(() => showResult(dist, null), RESULT_SUSPENSE_MS);
 }
 
 function showResult(dist, note) {
@@ -1101,7 +1123,88 @@ function showResult(dist, note) {
   document.getElementById('result-sub').innerHTML = subs.join('<br>');
   document.getElementById('result').style.display = '';
   document.getElementById('marker-info').textContent = `${dist.toFixed(1)} m`;
+
+  // 離陸地点がゴールに近いほど有利になるため、参考情報として直線距離を添える
+  const launchInfo = document.getElementById('result-launch');
+  if (launchDist !== null) {
+    launchInfo.textContent = `離陸地点からゴールまで: ${launchDist.toFixed(0)} m`;
+    launchInfo.style.display = '';
+  } else {
+    launchInfo.style.display = 'none';
+  }
+
+  // ターゲット至近(10m未満)なら、マーカー投下のリプレイボタンを出す
+  const replayBtn = document.getElementById('result-replay');
+  const canReplay = markerTrail && markerTrail.length > 1 && dist < REPLAY_DIST_THRESHOLD;
+  replayBtn.style.display = canReplay ? '' : 'none';
 }
+
+// ---- マーカー投下リプレイ(三人称視点・実時間で再生。何度でも見返せる) ----
+let replay = null; // 再生中の状態(nullなら非再生)
+let replayPrevFpv = false;
+
+function startReplay() {
+  if (!markerTrail || markerTrail.length < 2 || replay) return;
+  document.getElementById('result').style.display = 'none';
+  replayPrevFpv = fpv;
+  if (fpv) { fpv = false; applyViewMode(); }
+  if (measureLine) measureLine.visible = false; // 着地するまで計測ラインは隠す
+
+  const first = markerTrail[0];
+  const focusStart = first.pos.clone().add(new THREE.Vector3(0, 2, 0));
+  controls.target.copy(focusStart);
+  camera.position.copy(focusStart).add(new THREE.Vector3(60, 35, 60));
+  balloon.group.position.copy(first.balloonPos); // 気球も投下時点の位置に戻す
+
+  replay = {
+    samples: markerTrail,
+    duration: markerTrail[markerTrail.length - 1].t,
+    t: 0,
+    idx: 0,
+    prevFocus: first.pos.clone(),
+    finished: false,
+  };
+}
+
+function endReplay() {
+  replay = null;
+  if (replayPrevFpv) { fpv = true; applyViewMode(); }
+  document.getElementById('result').style.display = '';
+}
+
+// 実時間rawDtで記録済みの軌跡をなぞる。カメラは気球追従と同じ「差分平行移動」方式で追う。
+// マーカーだけでなく気球の位置も一緒に再現し、着地後は3秒の余韻を置いてから結果画面に戻る
+function stepReplay(rawDt) {
+  const r = replay;
+  if (r.finished) return; // 結果表示までの余韻待ち中(setTimeoutが解決するのを待つだけ)
+  r.t += rawDt;
+  const samples = r.samples;
+  if (r.t >= r.duration) {
+    const last = samples[samples.length - 1];
+    marker.mesh.position.copy(last.pos);
+    balloon.group.position.copy(last.balloonPos);
+    if (measureLine) measureLine.visible = true; // 着地したので計測ラインを表示
+    r.finished = true;
+    setTimeout(endReplay, RESULT_SUSPENSE_MS);
+    return;
+  }
+  let i = r.idx;
+  while (i < samples.length - 2 && samples[i + 1].t <= r.t) i++;
+  r.idx = i;
+  const a = samples[i], b = samples[i + 1] || a;
+  const span = Math.max(1e-6, b.t - a.t);
+  const k = THREE.MathUtils.clamp((r.t - a.t) / span, 0, 1);
+  const pos = a.pos.clone().lerp(b.pos, k);
+  marker.mesh.position.copy(pos);
+  balloon.group.position.copy(a.balloonPos.clone().lerp(b.balloonPos, k));
+
+  const focus = pos.clone().add(new THREE.Vector3(0, 2, 0));
+  const delta = new THREE.Vector3().subVectors(focus, r.prevFocus);
+  camera.position.add(delta);
+  controls.target.copy(focus);
+  r.prevFocus.copy(focus);
+}
+document.getElementById('result-replay').addEventListener('click', startReplay);
 
 // 制限時間の進行。時間内に投下できなければ現在地点で計測(フォールバック)
 function stepClock(dt) {
@@ -1293,11 +1396,15 @@ if (new URLSearchParams(location.search).has('autostart')) {
 }
 
 renderer.setAnimationLoop(() => {
-  const dt = Math.min(clock.getDelta(), 0.05) * timeScale;
+  const rawDt = Math.min(clock.getDelta(), 0.05); // 実時間(タイムスケール非依存)
+  const dt = rawDt * timeScale;
 
-  if (started) {
+  if (replay) {
+    // リプレイ中はシミュレーションを止め、記録した軌跡だけを実時間で再生する
+    stepReplay(rawDt);
+  } else if (started) {
     const w = stepPhysics(dt);
-    stepMarker(dt);
+    stepMarker(dt, rawDt);
     stepClock(dt);
     updateSounds(w.kt);
 

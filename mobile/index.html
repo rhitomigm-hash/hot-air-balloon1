@@ -39,11 +39,14 @@
   #result .r-title { font-size: 14px; color: #9ecfff; letter-spacing: 2px; }
   #result .r-dist { font-size: 44px; font-family: Consolas, monospace; margin: 6px 0; }
   #result .r-sub { font-size: 13px; color: #ffd54f; min-height: 18px; }
+  #result .r-launch { font-size: 10px; color: #8a99a8; margin-top: 2px; }
   #result button {
     margin-top: 12px; padding: 8px 22px; border: 0; border-radius: 6px;
     background: #2e6da4; color: #fff; font-size: 14px; cursor: pointer;
   }
   #result button:hover { background: #3a80bd; }
+  #result-replay { background: #ff5a00; }
+  #result-replay:hover { background: #ff7830; }
   #result .r-support {
     margin-top: 16px; padding-top: 14px; border-top: 1px solid #345a7a;
     text-align: left; max-width: 300px;
@@ -278,8 +281,10 @@
   <div class="r-title">JDG リザルト</div>
   <div class="r-dist"><span id="result-dist">--</span> m</div>
   <div class="r-sub" id="result-sub"></div>
+  <div class="r-launch" id="result-launch" style="display:none"></div>
   <button id="result-retry">もう一度飛ぶ</button>
   <button id="result-share">条件URLをコピー</button>
+  <button id="result-replay" style="display:none">🎯 投下シーンをリプレイ</button>
   <div class="r-support">
     <div class="s-title">🎈 日本代表を応援しよう!</div>
     <div class="s-text">
