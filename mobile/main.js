@@ -1040,6 +1040,12 @@ scene.add(target);
 // マーカーは1本。dropped後は marker.state が物理を持つ
 const marker = { available: 1, state: null, mesh: null };
 
+// マーカーの軌跡記録(リプレイ用)。実時間(タイムスケール非依存)のタイムスタンプで記録し、
+// 再生時も実時間でなぞることで「落下にかかった実際の時間」のまま見返せるようにする
+let markerTrail = null;
+let markerTrailElapsed = 0;
+const REPLAY_DIST_THRESHOLD = 10; // この距離未満(m)ならリプレイボタンを表示
+
 function dropMarker() {
   if (marker.available <= 0 || state.grounded || expired) return;
   marker.available = 0;
@@ -1053,9 +1059,12 @@ function dropMarker() {
   marker.mesh.position.copy(marker.state.pos);
   scene.add(marker.mesh);
   document.getElementById('marker-info').textContent = '投下!';
+  markerTrailElapsed = 0;
+  markerTrail = [{ t: 0, pos: marker.state.pos.clone() }];
 }
 
-function stepMarker(dt) {
+// rawDt: 実時間の経過秒(タイムスケールの影響を受けない)。リプレイの記録専用
+function stepMarker(dt, rawDt) {
   const m = marker.state;
   if (!m || m.landed) return;
   const w = windAt(m.pos.x, m.pos.z, m.pos.y);
@@ -1065,11 +1074,15 @@ function stepMarker(dt) {
   m.vel.z += ((w.vz - m.vel.z) / MARKER_WIND_TAU) * dt;
   m.pos.addScaledVector(m.vel, dt);
 
+  markerTrailElapsed += rawDt;
+  markerTrail.push({ t: markerTrailElapsed, pos: m.pos.clone() });
+
   const ground = terrain.getHeight(m.pos.x, m.pos.z);
   if (m.pos.y <= ground) {
     m.pos.y = ground + 0.3;
     m.landed = true;
     marker.mesh.position.copy(m.pos);
+    markerTrail.push({ t: markerTrailElapsed, pos: m.pos.clone() }); // 着地位置を確定点として追加
     onMarkerLanded(m.pos);
     return;
   }
@@ -1104,7 +1117,69 @@ function showResult(dist, note) {
   document.getElementById('result-sub').innerHTML = subs.join('<br>');
   document.getElementById('result').style.display = '';
   document.getElementById('marker-info').textContent = `${dist.toFixed(1)} m`;
+
+  // ターゲット至近(10m未満)なら、マーカー投下のリプレイボタンを出す
+  const replayBtn = document.getElementById('result-replay');
+  const canReplay = markerTrail && markerTrail.length > 1 && dist < REPLAY_DIST_THRESHOLD;
+  replayBtn.style.display = canReplay ? '' : 'none';
 }
+
+// ---- マーカー投下リプレイ(三人称視点・実時間で再生。何度でも見返せる) ----
+let replay = null; // 再生中の状態(nullなら非再生)
+let replayPrevFpv = false;
+
+function startReplay() {
+  if (!markerTrail || markerTrail.length < 2 || replay) return;
+  document.getElementById('result').style.display = 'none';
+  replayPrevFpv = fpv;
+  if (fpv) { fpv = false; applyViewMode(); }
+
+  const first = markerTrail[0].pos;
+  const focusStart = first.clone().add(new THREE.Vector3(0, 2, 0));
+  controls.target.copy(focusStart);
+  camera.position.copy(focusStart).add(new THREE.Vector3(60, 35, 60));
+
+  replay = {
+    samples: markerTrail,
+    duration: markerTrail[markerTrail.length - 1].t,
+    t: 0,
+    idx: 0,
+    prevFocus: first.clone(),
+  };
+}
+
+function endReplay() {
+  replay = null;
+  if (replayPrevFpv) { fpv = true; applyViewMode(); }
+  document.getElementById('result').style.display = '';
+}
+
+// 実時間rawDtで記録済みの軌跡をなぞる。カメラは気球追従と同じ「差分平行移動」方式で追う
+function stepReplay(rawDt) {
+  const r = replay;
+  r.t += rawDt;
+  const samples = r.samples;
+  if (r.t >= r.duration) {
+    marker.mesh.position.copy(samples[samples.length - 1].pos);
+    endReplay();
+    return;
+  }
+  let i = r.idx;
+  while (i < samples.length - 2 && samples[i + 1].t <= r.t) i++;
+  r.idx = i;
+  const a = samples[i], b = samples[i + 1] || a;
+  const span = Math.max(1e-6, b.t - a.t);
+  const k = THREE.MathUtils.clamp((r.t - a.t) / span, 0, 1);
+  const pos = a.pos.clone().lerp(b.pos, k);
+  marker.mesh.position.copy(pos);
+
+  const focus = pos.clone().add(new THREE.Vector3(0, 2, 0));
+  const delta = new THREE.Vector3().subVectors(focus, r.prevFocus);
+  camera.position.add(delta);
+  controls.target.copy(focus);
+  r.prevFocus.copy(focus);
+}
+document.getElementById('result-replay').addEventListener('click', startReplay);
 
 // 制限時間の進行。時間内に投下できなければ現在地点で計測(フォールバック)
 function stepClock(dt) {
@@ -1296,11 +1371,15 @@ if (new URLSearchParams(location.search).has('autostart')) {
 }
 
 renderer.setAnimationLoop(() => {
-  const dt = Math.min(clock.getDelta(), 0.05) * timeScale;
+  const rawDt = Math.min(clock.getDelta(), 0.05); // 実時間(タイムスケール非依存)
+  const dt = rawDt * timeScale;
 
-  if (started) {
+  if (replay) {
+    // リプレイ中はシミュレーションを止め、記録した軌跡だけを実時間で再生する
+    stepReplay(rawDt);
+  } else if (started) {
     const w = stepPhysics(dt);
-    stepMarker(dt);
+    stepMarker(dt, rawDt);
     stepClock(dt);
     updateSounds(w.kt);
 
