@@ -26,9 +26,11 @@
   #pibal th, #pibal td { padding: 2px 8px; text-align: right; border-bottom: 1px solid #345; }
   #pibal .note { font-size: 10px; color: #9ab; margin-top: 4px; }
   #result {
-    top: 50%; left: 50%; transform: translate(-50%, -60%);
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
     text-align: center; min-width: 260px; padding: 20px 28px;
     border: 1px solid #4a6a8a;
+    /* 応援ボックスで縦に長くなっても画面内に収め、中身をスクロールできるように */
+    max-height: 84vh; overflow-y: auto; overscroll-behavior: contain;
   }
   #result .r-title { font-size: 14px; color: #9ecfff; letter-spacing: 2px; }
   #result .r-dist { font-size: 44px; font-family: Consolas, monospace; margin: 6px 0; }
