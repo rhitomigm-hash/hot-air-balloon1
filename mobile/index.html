@@ -30,9 +30,11 @@
   #pibal th, #pibal td { padding: 2px 8px; text-align: right; border-bottom: 1px solid #345; }
   #pibal .note { font-size: 10px; color: #9ab; margin-top: 4px; }
   #result {
-    top: 50%; left: 50%; transform: translate(-50%, -60%);
-    text-align: center; min-width: 260px; padding: 20px 28px;
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
+    text-align: center; min-width: 260px; padding: 18px 24px;
     border: 1px solid #4a6a8a;
+    /* 応援ボックスで縦に長くなっても画面内に収め、中身をスクロールできるように */
+    max-height: 80vh; overflow-y: auto; overscroll-behavior: contain;
   }
   #result .r-title { font-size: 14px; color: #9ecfff; letter-spacing: 2px; }
   #result .r-dist { font-size: 44px; font-family: Consolas, monospace; margin: 6px 0; }
@@ -193,7 +195,13 @@
     .b-title { font-size: 16px; margin-bottom: 8px; }
     #launch-map { width: min(88vw, 60vh); height: min(88vw, 60vh); }
     #area-map { width: 88vw; }
-    #result { min-width: 220px; }
+    /* スマホではリザルトをコンパクトに(結果の数字が最初から見えるように) */
+    #result { min-width: 220px; max-width: min(84vw, 340px); max-height: 74vh; padding: 14px 18px; }
+    #result .r-dist { font-size: 34px; margin: 4px 0; }
+    #result button { margin-top: 8px; padding: 7px 18px; font-size: 13px; }
+    #result .r-support { margin-top: 12px; padding-top: 10px; }
+    #result .r-support a.s-btn { padding: 8px 6px; font-size: 13px; margin: 8px 0 6px; }
+    #result .r-support .s-text { font-size: 11px; }
   }
 </style>
 </head>
