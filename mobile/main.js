@@ -62,6 +62,7 @@ const M2FT = 3.28084;
 
 // JDGターゲットはエリア中央。離陸地点はブリーフィングでプレイヤーが選ぶ
 const TARGET_XZ = { x: 0, z: 0 };
+let launchDist = null; // 離陸地点〜ターゲットの直線距離(m)。startFlightで確定
 const BEST_KEY = 'balloon-jdg-proto-best';
 const TASK_LIMIT_S = 30 * 60; // 制限時間(ゲーム内秒)
 
@@ -1000,6 +1001,7 @@ function startFlight(x, z) {
   // 離陸地点とターゲット周辺は先に高解像度化しておく
   terrain.requestDetail(x, z);
   terrain.requestDetail(TARGET_XZ.x, TARGET_XZ.z);
+  launchDist = Math.hypot(x - TARGET_XZ.x, z - TARGET_XZ.z);
   state.pos.set(x, terrain.getHeight(x, z), z);
   state.vy = 0;
   state.heat = 0.5;
@@ -1117,6 +1119,15 @@ function showResult(dist, note) {
   document.getElementById('result-sub').innerHTML = subs.join('<br>');
   document.getElementById('result').style.display = '';
   document.getElementById('marker-info').textContent = `${dist.toFixed(1)} m`;
+
+  // 離陸地点がゴールに近いほど有利になるため、参考情報として直線距離を添える
+  const launchInfo = document.getElementById('result-launch');
+  if (launchDist !== null) {
+    launchInfo.textContent = `離陸地点からゴールまで: ${launchDist.toFixed(0)} m`;
+    launchInfo.style.display = '';
+  } else {
+    launchInfo.style.display = 'none';
+  }
 
   // ターゲット至近(10m未満)なら、マーカー投下のリプレイボタンを出す
   const replayBtn = document.getElementById('result-replay');
