@@ -904,6 +904,8 @@ function stepMarker(dt) {
   document.getElementById('marker-info').textContent = `落下中 ${Math.round(m.pos.y - ground)}m`;
 }
 
+const RESULT_SUSPENSE_MS = 3000; // 着地〜結果発表までの間(実時間。時間加速の影響を受けない)
+
 function onMarkerLanded(pos) {
   const dist = Math.hypot(pos.x - TARGET_XZ.x, pos.z - TARGET_XZ.z);
   // 着地点→ターゲットの計測ライン
@@ -912,7 +914,8 @@ function onMarkerLanded(pos) {
     new THREE.Vector3(TARGET_XZ.x, targetGroundY + 1, TARGET_XZ.z),
   ]);
   scene.add(new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0xffee58 })));
-  showResult(dist, null);
+  document.getElementById('marker-info').textContent = '計測中...';
+  setTimeout(() => showResult(dist, null), RESULT_SUSPENSE_MS);
 }
 
 function showResult(dist, note) {
