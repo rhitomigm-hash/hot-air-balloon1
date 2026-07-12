@@ -270,6 +270,30 @@ function buildBalloon() {
   return { group: g, flame, flameLight, envInnerMat, rope, ropeBaseY };
 }
 
+// ---- 気球の擬似影 ----
+// 真下の地面に置く円形の暗がり。対地高度が上がるほど大きく・薄くなり、
+// 高さの目安になる(ライトのシャドウマップより軽く、広域地形でも破綻しない)
+function buildShadowMesh() {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 128;
+  const ctx = cv.getContext('2d');
+  const grad = ctx.createRadialGradient(64, 64, 10, 64, 64, 62);
+  grad.addColorStop(0, 'rgba(0,0,0,0.9)');
+  grad.addColorStop(0.65, 'rgba(0,0,0,0.55)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 128, 128);
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(1, 1),
+    new THREE.MeshBasicMaterial({
+      map: new THREE.CanvasTexture(cv),
+      transparent: true, depthWrite: false, opacity: 0.55,
+    }));
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.renderOrder = 1; // 地形の上に重ねて描く
+  return mesh;
+}
+
 // ---- JDGターゲット(オレンジのX+白リング) ----
 function buildTarget(x, z, groundY) {
   const g = new THREE.Group();
@@ -860,6 +884,18 @@ function startFlight(x, z) {
 
 const balloon = buildBalloon();
 scene.add(balloon.group);
+const balloonShadow = buildShadowMesh();
+scene.add(balloonShadow);
+
+// 毎フレーム: 影を気球直下の地面に置き、対地高度でサイズと濃さを変える
+function updateShadow() {
+  const groundY = terrain.getHeight(state.pos.x, state.pos.z);
+  const agl = Math.max(0, state.pos.y - groundY);
+  balloonShadow.position.set(state.pos.x, groundY + 0.8, state.pos.z);
+  const size = Math.min(19 + agl * 0.05, 60); // 球皮直径≒18mを基準に高いほどぼやけて拡大
+  balloonShadow.scale.set(size, size, 1);
+  balloonShadow.material.opacity = Math.max(0.07, 0.55 * 300 / (300 + agl));
+}
 
 const targetGroundY = terrain.getHeight(TARGET_XZ.x, TARGET_XZ.z);
 const target = buildTarget(TARGET_XZ.x, TARGET_XZ.z, targetGroundY);
@@ -931,7 +967,7 @@ function onMarkerLanded(pos) {
     new THREE.Vector3(pos.x, pos.y + 1, pos.z),
     new THREE.Vector3(TARGET_XZ.x, targetGroundY + 1, TARGET_XZ.z),
   ]);
-  measureLine = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0xffee58 }));
+  measureLine = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0x29e0ff }));
   scene.add(measureLine);
   document.getElementById('marker-info').textContent = '計測中...';
   setTimeout(() => showResult(dist, null), RESULT_SUSPENSE_MS);
@@ -1225,6 +1261,7 @@ renderer.setAnimationLoop(() => {
     updateSounds(w.kt);
 
     balloon.group.position.copy(state.pos);
+    updateShadow();
     balloon.flame.visible = input.burner && state.fuel > 0;
     balloon.flameLight.intensity = balloon.flame.visible ? 40 : 0;
 

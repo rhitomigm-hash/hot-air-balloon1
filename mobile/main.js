@@ -1105,7 +1105,7 @@ function onMarkerLanded(pos) {
     new THREE.Vector3(pos.x, pos.y + 1, pos.z),
     new THREE.Vector3(TARGET_XZ.x, targetGroundY + 1, TARGET_XZ.z),
   ]);
-  measureLine = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0xffee58 }));
+  measureLine = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0x29e0ff }));
   scene.add(measureLine);
   document.getElementById('marker-info').textContent = '計測中...';
   setTimeout(() => showResult(dist, null), RESULT_SUSPENSE_MS);
