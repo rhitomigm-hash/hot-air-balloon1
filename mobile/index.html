@@ -13,7 +13,7 @@
     position: fixed; padding: 10px 14px; border-radius: 8px;
     background: rgba(10, 20, 30, 0.72); color: #e8f0f6;
     font-family: "Segoe UI", "Yu Gothic UI", sans-serif; font-size: 13px;
-    user-select: none;
+    user-select: none; box-sizing: border-box; /* widthにパディングを含めて幅を揃えやすくする */
   }
   .panel .num { font-family: Consolas, monospace; }
   #instruments { top: 12px; left: 12px; min-width: 190px; }
@@ -25,10 +25,19 @@
   .bar > div { height: 100%; width: 50%; }
   #fuel-fill { background: #4caf50; }
   #heat-fill { background: #ff7043; }
+  /* 風データパネルを開いている間は他の4ボタン(視点/加速/風データ/音)を隠し、
+     パネル自身が空いたその場所を使う。閉じる操作はパネル右下のボタンで行う */
   #pibal { top: 12px; right: 12px; }
+  #pibal .pibal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  #pibal .pibal-head b { font-size: 13px; line-height: 1.2; }
   #pibal table { border-collapse: collapse; font-family: Consolas, monospace; font-size: 12px; }
   #pibal th, #pibal td { padding: 2px 8px; text-align: right; border-bottom: 1px solid #345; }
-  #pibal .note { font-size: 10px; color: #9ab; margin-top: 4px; }
+  #pibal .note { font-size: 10px; color: #9ab; margin-top: 4px; line-height: 1.4; }
+  #wind-mode-toggle, #pibal-close {
+    border: 1px solid #4a6a8a; border-radius: 6px; background: rgba(15, 30, 45, 0.75);
+    color: #9ecfff; font-size: 11px; padding: 3px 8px; cursor: pointer;
+  }
+  #pibal-close { display: block; margin: 8px 0 0 auto; } /* パネル右下 */
   #result {
     top: 50%; left: 50%; transform: translate(-50%, -50%);
     text-align: center; min-width: 260px; padding: 18px 24px;
@@ -68,7 +77,19 @@
   }
   #help { bottom: 12px; left: 12px; font-size: 12px; color: #cdd9e4; line-height: 1.6; }
   #help b { color: #ffd54f; font-family: Consolas, monospace; }
-  #credit { bottom: 12px; right: 12px; font-size: 11px; color: #b8c4d0; }
+  /* 出典はⓘアイコンに折りたたみ、タップした時だけ全文を表示する。
+     常時表示しないことで、コンパスやキー操作ヒントとの重なりを避ける */
+  /* コンパスのすぐ左下に配置(画面中央基準。左親指のドラッグ操作域を避ける) */
+  #credit-toggle {
+    position: fixed; bottom: 12px; right: 50%; margin-right: 70px; z-index: 5;
+    width: 30px; height: 30px; border-radius: 50%; border: 1px solid #4a6a8a;
+    background: rgba(15, 30, 45, 0.75); color: #cdd9e4; font-size: 15px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  #credit {
+    display: none; bottom: 140px; left: 12px; right: auto;
+    max-width: min(88vw, 420px); font-size: 11px; color: #b8c4d0; line-height: 1.6;
+  }
   #credit a { color: #9ecfff; }
   #loading {
     position: fixed; inset: 0; display: flex; flex-direction: column;
@@ -153,20 +174,22 @@
   /* アクションボタンは右端の縦一列(右手の親指/人差し指で操作)。
      左半分は視点ドラッグ(左親指)用に空けておく */
   #btn-burner {
-    right: 12px; bottom: 96px; width: 104px; height: 104px;
+    right: 12px; bottom: 46px; width: 104px; height: 104px;
     font-size: 17px; border-color: #ff7043; color: #ffb74d;
   }
   #btn-rip {
-    right: 12px; bottom: 214px; width: 104px; height: 62px;
+    right: 12px; bottom: 164px; width: 104px; height: 62px;
     font-size: 15px; border-color: #64b5f6; color: #90caf9;
   }
   #btn-marker {
-    right: 12px; bottom: 290px; width: 104px; height: 62px;
+    right: 12px; bottom: 280px; width: 104px; height: 62px;
     font-size: 14px; border-color: #ffd54f; color: #ffe082;
   }
+  /* 画面幅に関わらず常に縦一列(TV等の大画面でも風データ等と重ならないように、
+     端末判定はせずレイアウトだけで対応する) */
   #touch-tools {
     position: fixed; top: 12px; right: 12px;
-    display: none; gap: 8px; z-index: 5;
+    display: none; flex-direction: column; align-items: flex-end; gap: 8px; z-index: 5;
   }
   #touch-tools button {
     border: 1px solid #4a6a8a; border-radius: 8px; padding: 8px 14px;
@@ -177,7 +200,7 @@
   /* ---- スマホ向けレイアウト調整 ---- */
   @media (max-width: 760px) {
     #instruments {
-      min-width: 128px; font-size: 11px; padding: 6px 10px 8px;
+      width: 180px; min-width: 0; font-size: 11px; padding: 6px 10px 8px;
       background: rgba(10, 20, 30, 0.55); /* 気球と重なっても背後が見えるよう薄めに */
     }
     #instruments .alt-big { font-size: 22px; }
@@ -188,12 +211,20 @@
       display: block; margin-top: 5px; text-align: center;
       font-size: 10px; color: #9ecfff;
     }
-    #pibal { display: none; } /* スマホでは「風」ボタンで開閉 */
+    /* HUDと同じ幅・パディングに揃えて重なりを防ぐ(スマホでは「風」ボタンで開閉)。
+       文字サイズと行間も詰めて、折り返しによる縦の伸びを抑える */
+    #pibal { display: none; width: 180px; padding: 6px 10px 8px; }
+    #pibal .pibal-head b { font-size: 11px; }
+    #pibal table { font-size: 11px; }
+    #pibal th, #pibal td { padding: 1px 4px; }
+    #pibal .note { font-size: 9px; line-height: 1.3; }
+    #wind-mode-toggle { font-size: 10px; padding: 2px 6px; }
     #help { display: none; }  /* キーボードヘルプは不要 */
-    /* 上部ツールは右上の縦一列にして計器パネルとの重なりを防ぐ */
-    #touch-tools { flex-direction: column; align-items: flex-end; gap: 6px; }
+    #touch-tools { gap: 6px; }
     #compass { width: 92px; height: 92px; bottom: 14px; }
-    #credit { font-size: 9px; padding: 4px 8px; }
+    #credit-toggle { bottom: 14px; margin-right: 56px; }
+    /* 右側のアクションボタン列と被らないよう、幅を狭める */
+    #credit { font-size: 9px; padding: 4px 8px; max-width: calc(100vw - 170px); }
     .b-panel { padding: 12px 14px 16px; }
     .b-title { font-size: 16px; margin-bottom: 8px; }
     #launch-map { width: min(88vw, 60vh); height: min(88vw, 60vh); }
@@ -216,7 +247,7 @@
   <div class="row detail"><span>高度(MSL)</span><span class="num"><span id="alt-m">--</span> m</span></div>
   <div class="row"><span>対地高度</span><span class="num"><span id="agl">--</span> m</span></div>
   <div class="row"><span>昇降</span><span class="num"><span id="vario">--</span> m/s</span></div>
-  <div class="row"><span>風(現在高度)</span><span class="num" id="wind">---° / --kt</span></div>
+  <div class="row"><span id="wind-label">風(現在高度)</span><span class="num" id="wind">---° / --kt</span></div>
   <div class="row detail"><span>燃料</span><span class="num"><span id="fuel">100</span>%</span></div>
   <div class="bar"><div id="fuel-fill"></div></div>
   <div class="row detail"><span>エンベロープ温度</span></div>
@@ -304,12 +335,16 @@
 </div>
 
 <div id="pibal" class="panel">
-  <b>パイバル観測データ</b>
+  <div class="pibal-head">
+    <b>パイバル観測データ</b>
+    <button id="wind-mode-toggle" type="button">FROM</button>
+  </div>
   <table>
     <thead><tr><th>高度ft</th><th>風向°</th><th>風速kt</th></tr></thead>
     <tbody id="pibal-body"></tbody>
   </table>
-  <div class="note">高度: 対地(AGL) / 風向: FROM(磁方位)<br>※磁気偏角は未考慮(プロトタイプ)</div>
+  <div class="note">高度: 対地(AGL) / 風向: <span id="pibal-mode-label">FROM</span>(磁方位)</div>
+  <button id="pibal-close" type="button">閉じる ▲</button>
 </div>
 
 <canvas id="compass" width="150" height="150"></canvas>
@@ -330,6 +365,7 @@
   <b>P</b> パイバル表 表示/非表示 マウスドラッグ: 視点回転 / ホイール: ズーム
 </div>
 
+<button id="credit-toggle" type="button" aria-label="出典を表示">ⓘ</button>
 <div id="credit" class="panel">
   出典: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院 地理院タイル</a>(標高タイル・全国最新写真)
 </div>

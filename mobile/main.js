@@ -464,7 +464,21 @@ function togglePibal() {
   const p = document.getElementById('pibal');
   const hidden = getComputedStyle(p).display === 'none';
   p.style.display = hidden ? 'block' : 'none';
+  // 開いている間は他の4ボタン(視点/加速/風データ/音)を隠し、パネルがその場所を使う。
+  // 閉じる操作はパネル右下の「閉じる」ボタンで行う
+  for (const id of ['btn-view', 'btn-speed', 'btn-pibal', 'btn-sound']) {
+    document.getElementById(id).style.display = hidden ? 'none' : '';
+  }
 }
+document.getElementById('pibal-close').addEventListener('click', togglePibal);
+
+// 出典のⓘアイコン開閉(普段は表示せず、コンパスやキー操作ヒントとの重なりを避ける)
+function toggleCredit() {
+  const c = document.getElementById('credit');
+  const hidden = getComputedStyle(c).display === 'none';
+  c.style.display = hidden ? 'block' : 'none';
+}
+document.getElementById('credit-toggle').addEventListener('click', toggleCredit);
 
 function setTimeScale(v) {
   timeScale = v;
@@ -549,10 +563,26 @@ function applyViewMode() {
   }
 }
 
+// ---- 風向表示のFROM/TO切替(パネルの表とHUDの現在高度風向を連動) ----
+// FROM=風が吹いてくる方向(磁方位、実競技の慣行) / TO=風が吹いていく方向(FROM+180°)
+let windDisplayMode = 'from';
+const toDisplayDir = (dirFrom) => (windDisplayMode === 'to' ? (dirFrom + 180) % 360 : dirFrom);
+
+function toggleWindMode() {
+  windDisplayMode = windDisplayMode === 'from' ? 'to' : 'from';
+  const label = windDisplayMode.toUpperCase();
+  document.getElementById('wind-mode-toggle').textContent = label;
+  document.getElementById('pibal-mode-label').textContent = label;
+  document.getElementById('wind-label').textContent =
+    windDisplayMode === 'to' ? '風(現在高度・TO)' : '風(現在高度)';
+  renderFlightPibal();
+}
+document.getElementById('wind-mode-toggle').addEventListener('click', toggleWindMode);
+
 // ---- 飛行中HUDのパイバル表を描画 ----
 function renderFlightPibal() {
   document.getElementById('pibal-body').innerHTML = PIBAL
-    .map((r) => `<tr><td>${r.ft}</td><td>${String(Math.round(r.dir)).padStart(3, '0')}</td><td>${r.kt}</td></tr>`)
+    .map((r) => `<tr><td>${r.ft}</td><td>${String(Math.round(toDisplayDir(r.dir))).padStart(3, '0')}</td><td>${r.kt}</td></tr>`)
     .join('');
 }
 renderFlightPibal();
@@ -1350,7 +1380,7 @@ function updateHud(w) {
   hud.altM.textContent = Math.round(state.pos.y);
   hud.agl.textContent = Math.round(state.pos.y - ground);
   hud.vario.textContent = (state.vy >= 0 ? '+' : '') + state.vy.toFixed(1);
-  hud.wind.textContent = `${String(Math.round(w.dir)).padStart(3, '0')}° / ${w.kt.toFixed(0)}kt`;
+  hud.wind.textContent = `${String(Math.round(toDisplayDir(w.dir))).padStart(3, '0')}° / ${w.kt.toFixed(0)}kt`;
   hud.fuel.textContent = Math.round(state.fuel);
   hud.fuelFill.style.width = `${state.fuel}%`;
   hud.heatFill.style.width = `${state.heat * 100}%`;
