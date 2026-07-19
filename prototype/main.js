@@ -1116,6 +1116,7 @@ function showResult(dist, note) {
   document.getElementById('result-dist').textContent = dist.toFixed(1);
   document.getElementById('result-sub').innerHTML = subs.join('<br>');
   document.getElementById('result').style.display = '';
+  document.getElementById('result-reopen').style.display = 'none'; // 隠していた場合の後始末
   document.getElementById('marker-info').textContent = `${dist.toFixed(1)} m`;
 
   // 離陸地点がゴールに近いほど有利になるため、参考情報として直線距離を添える
@@ -1222,6 +1223,16 @@ function stepClock(dt) {
 }
 
 document.getElementById('result-retry').addEventListener('click', () => location.reload());
+
+// 結果パネルの開閉(投下後、パネルをどけて着地点周辺の景色を見たいという要望への対応)
+document.getElementById('result-hide').addEventListener('click', () => {
+  document.getElementById('result').style.display = 'none';
+  document.getElementById('result-reopen').style.display = '';
+});
+document.getElementById('result-reopen').addEventListener('click', () => {
+  document.getElementById('result').style.display = '';
+  document.getElementById('result-reopen').style.display = 'none';
+});
 
 // 物理状態。pos.y はバスケット底面の標高(MSL)
 const state = {
