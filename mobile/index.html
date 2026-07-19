@@ -242,6 +242,76 @@
   }
   #gw-report b { color: #a5d6a7; font-size: 15px; }
 
+  /* ---- マルチプレイ(みんなで飛ぶ) ---- */
+  #mp-box { margin-top: 14px; padding-top: 10px; border-top: 1px solid #2a3a4a; }
+  #mp-box input[type="text"] {
+    background: #0d1620; border: 1px solid #2a3a4a; border-radius: 4px;
+    color: #e8f0f6; font-size: 13px; padding: 5px 8px;
+  }
+  #mp-name { width: 120px; }
+  #mp-code-in { width: 90px; text-transform: uppercase; }
+  /* 「ルームを作る」とは別グループだと分かるよう、上に区切り線+補足文を入れて離す */
+  .mp-join-row { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #2a3a4a; }
+  .mp-join-hint { font-size: 11px; color: #9ab; margin-bottom: 4px; }
+  /* 色パレットはホスト側(#mp-colors)とゲスト入室ダイアログ(#mp-join-colors)で共通 */
+  #mp-colors, #mp-join-colors { display: flex; gap: 5px; flex-wrap: wrap; margin: 8px 0; }
+  #mp-colors button, #mp-join-colors button {
+    width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent;
+    cursor: pointer; padding: 0;
+  }
+  #mp-colors button.sel, #mp-join-colors button.sel {
+    border-color: #fff; box-shadow: 0 0 0 2px rgba(255,255,255,0.35);
+  }
+  .mp-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+  .mp-btn {
+    background: #1a2a3a; border: 1px solid #345a7a; border-radius: 4px;
+    color: #e8f0f6; font-size: 13px; padding: 6px 12px; cursor: pointer;
+  }
+  .mp-btn:hover { background: #24384c; }
+  .mp-btn:disabled { background: #33414f; color: #8a99a8; cursor: default; }
+  .mp-btn.primary { background: #2e6da4; border: 0; }
+  .mp-btn.primary:not(:disabled):hover { background: #3a80bd; }
+  #mp-roster { margin-top: 8px; font-size: 13px; line-height: 1.8; }
+  #mp-roster .chip, #mp-board .chip, #mp-results .chip {
+    display: inline-block; width: 11px; height: 11px; border-radius: 50%;
+    margin-right: 6px; vertical-align: -1px;
+  }
+  #mp-status { margin-top: 6px; font-size: 12px; color: #ffd54f; min-height: 16px; }
+  /* 参加ダイアログ(ゲストが地形読み込み前に名前と色を決める) */
+  #mp-join {
+    position: fixed; inset: 0; z-index: 20; display: none;
+    align-items: center; justify-content: center;
+    background: rgba(8, 14, 20, 0.92);
+    font-family: "Segoe UI", "Yu Gothic UI", sans-serif; color: #e8f0f6;
+  }
+  /* 同時離陸カウントダウン */
+  #mp-countdown {
+    position: fixed; inset: 0; z-index: 15; display: none;
+    align-items: center; justify-content: center; flex-direction: column; gap: 10px;
+    background: rgba(8, 14, 20, 0.85); color: #e8f0f6;
+    font-family: "Segoe UI", "Yu Gothic UI", sans-serif;
+  }
+  #mp-countdown .num { font-size: 96px; font-family: Consolas, monospace; color: #9ecfff; }
+  /* 飛行中スコアボード(投下✓のみ。距離は全員確定まで見せない)。
+     左下寄り・キー操作ヘルプの上に置き、左上のHUDと重ならないようにする */
+  #mp-board {
+    display: none; bottom: 130px; left: 12px; width: 200px;
+    font-size: 12px; line-height: 1.7; padding: 6px 10px 8px;
+    max-height: 30vh; overflow-y: auto;
+  }
+  #mp-board .done { color: #9ecfff; }
+  /* 全員確定後の順位表 */
+  #mp-results {
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
+    text-align: center; min-width: 280px; max-width: 90vw;
+    max-height: 84vh; overflow-y: auto;
+    padding: 18px 24px; border: 1px solid #4a6a8a; z-index: 12; display: none;
+  }
+  #mp-results table { border-collapse: collapse; margin: 10px auto 0; font-size: 14px; }
+  #mp-results th, #mp-results td { padding: 4px 12px; border-bottom: 1px solid #345; text-align: left; }
+  #mp-results td.num { font-family: Consolas, monospace; text-align: right; }
+  #mp-results .rank1 { color: #ffd54f; font-weight: bold; }
+
   /* ---- スマホ向けレイアウト調整 ---- */
   @media (max-width: 760px) {
     #instruments {
@@ -364,6 +434,33 @@
         <div class="mapnote" data-i18n="launch.mapnote">地理院タイル(標準地図)/ 北が上 / タップ: 離陸地点を選択 / ピンチ: 拡大縮小 / ドラッグ: 移動</div>
       </div>
     </div>
+    <div id="mp-box">
+      <div class="b-sub" data-i18n="mp.title">🎈 みんなで飛ぶ(ベータ)</div>
+      <div id="mp-entry">
+        <div class="mp-row">
+          <input type="text" id="mp-name" maxlength="12" data-i18n-attr="placeholder:mp.namePlaceholder" placeholder="パイロット名">
+        </div>
+        <div id="mp-colors"></div>
+        <div class="mp-row">
+          <button type="button" class="mp-btn primary" id="mp-create" data-i18n="mp.createBtn">ルームを作る</button>
+        </div>
+        <div class="mp-join-row">
+          <div class="mp-join-hint" data-i18n="mp.joinHint">友達から届いたコードで参加する場合はこちら↓</div>
+          <div class="mp-row">
+            <input type="text" id="mp-code-in" maxlength="6" data-i18n-attr="placeholder:mp.codePlaceholder" placeholder="コード">
+            <button type="button" class="mp-btn" id="mp-join-btn" data-i18n="mp.joinBtn">参加</button>
+          </div>
+        </div>
+      </div>
+      <div id="mp-lobby" style="display:none">
+        <div class="mp-row"><span data-i18n="mp.roomLabel">ルーム: </span><b id="mp-room-code"></b>
+          <button type="button" class="mp-btn" id="mp-copy" data-i18n="mp.copyBtn">招待URLをコピー</button>
+        </div>
+        <div id="mp-roster"></div>
+        <button type="button" class="mp-btn primary" id="mp-start" style="display:none" disabled data-i18n="mp.waitingReady">全員の準備完了待ち</button>
+      </div>
+      <div id="mp-status"></div>
+    </div>
   </div>
 </div>
 
@@ -433,6 +530,37 @@
 <button id="credit-toggle" type="button" aria-label="出典を表示" data-i18n-attr="aria-label:credit.aria">ⓘ</button>
 <div id="credit" class="panel" data-i18n-html="credit.html">
   出典: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院 地理院タイル</a>(標高タイル・全国最新写真)
+</div>
+
+<div id="mp-join">
+  <div class="b-panel">
+    <div class="b-title" data-i18n="mpJoin.title">ルームに参加</div>
+    <div style="font-size:13px" data-i18n-html="mpJoin.descHtml">ルーム <b id="mp-join-code"></b> に参加します。名前と気球の色を選んでください。</div>
+    <div class="mp-row" style="margin-top:10px">
+      <input type="text" id="mp-join-name" maxlength="12" data-i18n-attr="placeholder:mp.namePlaceholder" placeholder="パイロット名">
+    </div>
+    <div id="mp-join-colors"></div>
+    <button type="button" class="mp-btn primary" id="mp-join-go" style="margin-top:8px" data-i18n="mpJoin.goBtn">参加する</button>
+    <div id="mp-join-status" style="margin-top:8px;font-size:12px;color:#ffd54f"></div>
+  </div>
+</div>
+
+<div id="mp-countdown">
+  <div data-i18n="mpCountdown.label">同時離陸まで</div>
+  <div class="num" id="mp-countdown-num">5</div>
+</div>
+
+<div id="mp-board" class="panel"></div>
+
+<div id="mp-results" class="panel">
+  <div class="r-title" data-i18n="mpResults.title">🏁 リザルト(全員確定)</div>
+  <table>
+    <thead><tr><th data-i18n="mpResults.thRank">#</th><th data-i18n="mpResults.thPilot">パイロット</th><th style="text-align:right" data-i18n="mpResults.thDist">距離</th></tr></thead>
+    <tbody id="mp-results-body"></tbody>
+  </table>
+  <button id="mp-rematch" style="display:none;margin-top:12px" class="mp-btn primary" data-i18n="mpResults.rematchBtn">もう一回戦</button>
+  <div id="mp-results-gw" style="margin-top:8px;font-size:11px;color:#8a99a8"></div>
+  <div id="mp-results-note" style="margin-top:10px;font-size:12px;color:#9ab"></div>
 </div>
 
 <div id="loading" style="display:none">
