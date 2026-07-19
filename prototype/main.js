@@ -683,7 +683,7 @@ function setupAreaMap(onSelect) {
   addEventListener('mouseup', () => { drag = null; });
   cv.addEventListener('wheel', (e) => {
     e.preventDefault();
-    const nz = THREE.MathUtils.clamp(z + (e.deltaY < 0 ? 1 : -1), 4, 12);
+    const nz = THREE.MathUtils.clamp(z + (e.deltaY < 0 ? 1 : -1), 4, 17);
     if (nz === z) return;
     const r = cssRatio();
     const [fx, fy] = toTile(e.offsetX * r, e.offsetY * r);

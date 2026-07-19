@@ -796,7 +796,7 @@ function setupAreaMap(onSelect) {
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pinch && pts.size === 2) {
       const steps = Math.round(Math.log2(pinchDist() / pinch.d0));
-      const nz = THREE.MathUtils.clamp(pinch.z0 + steps, 4, 12);
+      const nz = THREE.MathUtils.clamp(pinch.z0 + steps, 4, 17);
       if (nz !== z) {
         const k = 2 ** (nz - z); // 画面中央を基準にズーム
         z = nz;
@@ -829,7 +829,7 @@ function setupAreaMap(onSelect) {
   cv.addEventListener('pointercancel', endPointer);
   cv.addEventListener('wheel', (e) => {
     e.preventDefault();
-    const nz = THREE.MathUtils.clamp(z + (e.deltaY < 0 ? 1 : -1), 4, 12);
+    const nz = THREE.MathUtils.clamp(z + (e.deltaY < 0 ? 1 : -1), 4, 17);
     if (nz === z) return;
     const r = cssRatio();
     const [fx, fy] = toTile(e.offsetX * r, e.offsetY * r);
