@@ -60,6 +60,18 @@
   #result button:hover { background: #3a80bd; }
   #result-replay { background: #ff5a00; }
   #result-replay:hover { background: #ff7830; }
+  /* 結果を隠して裏の気球・着地点周辺を見るための開閉ボタン */
+  #result-hide {
+    position: absolute; top: 6px; right: 6px; margin: 0 !important;
+    padding: 2px 8px !important; font-size: 11px !important;
+    background: rgba(15, 30, 45, 0.75) !important;
+    border: 1px solid #4a6a8a !important;
+  }
+  #result-reopen {
+    position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 11;
+    border: 1px solid #4a6a8a; border-radius: 6px; background: rgba(15, 30, 45, 0.75);
+    color: #9ecfff; font-size: 12px; padding: 4px 10px; cursor: pointer;
+  }
   #result .r-support {
     margin-top: 16px; padding-top: 14px; border-top: 1px solid #345a7a;
     text-align: left; max-width: 300px;
@@ -243,6 +255,7 @@
 </div>
 
 <div id="result" class="panel" style="display:none">
+  <button id="result-hide" type="button" title="結果を隠して周囲を見る">隠す ▾</button>
   <div class="r-title">JDG リザルト</div>
   <div class="r-dist"><span id="result-dist">--</span> m</div>
   <div class="r-sub" id="result-sub"></div>
@@ -268,6 +281,7 @@
        target="_blank" rel="noopener">寄付のご案内はInstagramへ</a>
   </div>
 </div>
+<button id="result-reopen" type="button" style="display:none">結果を表示 ▴</button>
 
 <div id="pibal" class="panel">
   <div class="pibal-head">
