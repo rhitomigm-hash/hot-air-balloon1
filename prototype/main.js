@@ -406,12 +406,19 @@ function buildMarkerMesh() {
 // ---- サウンド(Web Audio合成、外部ファイル不要) ----
 // ブラウザの自動再生制限があるため、初回のユーザー操作で初期化し、
 // suspended のままなら操作のたびに resume する(前回鳴らなかった原因への対処)
-let audioCtx = null, burnerGain = null, ripGain = null, windGain = null;
+let audioCtx = null, masterGain = null, burnerGain = null, ripGain = null, windGain = null;
 let sndBurnerOn = false, sndRipOn = false;
+
+// サウンドのオン/オフ設定(localStorageに保存)。マスターゲインで一括ミュートする
+const SOUND_KEY = 'balloon-sound';
+let soundOn = localStorage.getItem(SOUND_KEY) !== 'off';
 
 function ensureAudio() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = soundOn ? 1 : 0;
+    masterGain.connect(audioCtx.destination);
     const noise = audioCtx.createBuffer(1, audioCtx.sampleRate * 2, audioCtx.sampleRate);
     const d = noise.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
@@ -425,7 +432,7 @@ function ensureAudio() {
       filter.Q.value = q;
       const gainNode = audioCtx.createGain();
       gainNode.gain.value = 0;
-      src.connect(filter).connect(gainNode).connect(audioCtx.destination);
+      src.connect(filter).connect(gainNode).connect(masterGain);
       src.start();
       return gainNode;
     };
@@ -437,6 +444,17 @@ function ensureAudio() {
 }
 addEventListener('keydown', ensureAudio);
 addEventListener('pointerdown', ensureAudio);
+
+// ---- 音のミュート切替(計器パネルの「音」行をクリック、またはSキー) ----
+function toggleSound() {
+  soundOn = !soundOn;
+  localStorage.setItem(SOUND_KEY, soundOn ? 'on' : 'off');
+  ensureAudio(); // ユーザー操作なのでここでresumeも通る
+  document.getElementById('sound-status').textContent = soundOn ? 'ON' : 'OFF';
+  if (masterGain) masterGain.gain.setTargetAtTime(soundOn ? 1 : 0, audioCtx.currentTime, 0.05);
+}
+document.getElementById('sound-status').textContent = soundOn ? 'ON' : 'OFF';
+document.getElementById('sound-row').addEventListener('click', toggleSound);
 
 // 毎フレーム呼ばれ、入力状態・風速に音量を追従させる
 function updateSounds(windKt) {
@@ -490,6 +508,7 @@ addEventListener('keydown', (e) => {
     p.style.display = p.style.display === 'none' ? '' : 'none';
   }
   if (e.code === 'KeyG' && started) reportGroundCrew();
+  if (e.code === 'KeyS') toggleSound();
   if (e.code >= 'Digit1' && e.code <= 'Digit4') {
     timeScale = [1, 2, 4, 8][Number(e.code.slice(5)) - 1];
     document.getElementById('tscale').textContent = timeScale;
@@ -529,6 +548,22 @@ function applyViewMode() {
   }
 }
 
+// ---- 風向表示のFROM/TO切替(パネルの表とHUDの現在高度風向を連動) ----
+// FROM=風が吹いてくる方向(磁方位、実競技の慣行) / TO=風が吹いていく方向(FROM+180°)
+let windDisplayMode = 'from';
+const toDisplayDir = (dirFrom) => (windDisplayMode === 'to' ? (dirFrom + 180) % 360 : dirFrom);
+
+function toggleWindMode() {
+  windDisplayMode = windDisplayMode === 'from' ? 'to' : 'from';
+  const label = windDisplayMode.toUpperCase();
+  document.getElementById('wind-mode-toggle').textContent = label;
+  document.getElementById('pibal-mode-label').textContent = label;
+  document.getElementById('wind-label').textContent =
+    windDisplayMode === 'to' ? '風(現在高度・TO)' : '風(現在高度)';
+  renderFlightPibal();
+}
+document.getElementById('wind-mode-toggle').addEventListener('click', toggleWindMode);
+
 // ---- 飛行中HUDのパイバル表を描画 ----
 function renderFlightPibal() {
   document.getElementById('pibal-body').innerHTML = PIBAL
@@ -538,9 +573,9 @@ function renderFlightPibal() {
       if (i === 0 && groundWind) {
         const g = groundWind.launchGround;
         return `<tr class="gw-stale"><td>${r.ft}</td>` +
-          `<td>${String(Math.round(g.dir)).padStart(3, '0')}</td><td>${g.kt.toFixed(1)}</td></tr>`;
+          `<td>${String(Math.round(toDisplayDir(g.dir))).padStart(3, '0')}</td><td>${g.kt.toFixed(1)}</td></tr>`;
       }
-      return `<tr><td>${r.ft}</td><td>${String(Math.round(r.dir)).padStart(3, '0')}</td><td>${r.kt}</td></tr>`;
+      return `<tr><td>${r.ft}</td><td>${String(Math.round(toDisplayDir(r.dir))).padStart(3, '0')}</td><td>${r.kt}</td></tr>`;
     })
     .join('');
 }
@@ -1312,7 +1347,7 @@ function updateHud(w) {
   hud.altM.textContent = Math.round(state.pos.y);
   hud.agl.textContent = Math.round(state.pos.y - ground);
   hud.vario.textContent = (state.vy >= 0 ? '+' : '') + state.vy.toFixed(1);
-  hud.wind.textContent = `${String(Math.round(w.dir)).padStart(3, '0')}° / ${w.kt.toFixed(0)}kt`;
+  hud.wind.textContent = `${String(Math.round(toDisplayDir(w.dir))).padStart(3, '0')}° / ${w.kt.toFixed(0)}kt`;
   hud.fuel.textContent = Math.round(state.fuel);
   hud.fuelFill.style.width = `${state.fuel}%`;
   hud.heatFill.style.width = `${state.heat * 100}%`;
