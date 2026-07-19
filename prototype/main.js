@@ -4,6 +4,25 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { buildTerrain, lonLatToTile } from './terrain.js';
+import { Room, randomRoomCode, BALLOON_COLORS } from './net.js';
+
+// マルチプレイ状態(ソロプレイでは MP.room が null のまま)。実装はファイル末尾の「マルチプレイ」節
+const MP = {
+  room: null, code: null, myName: '', myColor: 0,
+  desired: 1,          // 自分が希望する時間加速(全体への反映はサーバーの合意値)
+  ready: false, launch: null,
+  resultsShown: false, // 全員確定の順位表を表示済みか
+  isCreator: false,    // 自分がルームを作った本人か(再接続時のcreate指定に使う)
+  reconnecting: false, // 再接続処理の多重起動防止
+  pendingRematch: false, // 切断中に「もう一回戦」を押した場合、再接続後に送る
+  myDropped: false, myDist: null, // 自分の投下・計測状態(切断中に進んだ分を復帰時に再送)
+  // フルリロード後の?room=復帰用。resumeStateはhello受信時のサーバー局面
+  // (lobby以外ならブリーフィングを出さずその場で再開する)。isResumingの間は
+  // resultsイベントの演出待ち(3秒)を省略し、即座に結果画面を出す
+  resumeState: null, isResuming: false,
+};
+const ghostMeshes = new Map(); // playerId -> THREE.Group(他プレイヤーの気球)
+const ghostMarkers = new Map(); // playerId -> { mesh, vel:THREE.Vector3, landed }(他プレイヤーのマーカー、見た目のみ)
 
 // ---- 舞台設定 ----
 const TILE_RADIUS = 2; // 5x5タイル ≒ 20km四方
@@ -192,15 +211,24 @@ function buildWickerTexture() {
   return tex;
 }
 
-// ゴア(縦の縫い目パネル)模様のテクスチャ。bright=true は内面用の明るい配色
-function buildGoreTexture(bright) {
+// 色を白方向に混ぜて明るくする(内面=日光が透けた布の表現用)
+function lighten(hex, k) {
+  const n = parseInt(hex.slice(1), 16);
+  const ch = (v) => Math.round(v + (255 - v) * k);
+  return `rgb(${ch((n >> 16) & 255)},${ch((n >> 8) & 255)},${ch(n & 255)})`;
+}
+
+// ゴア(縦の縫い目パネル)模様のテクスチャ。bright=true は内面用の明るい配色。
+// pal={cols:[濃,淡], seam} を渡すと球皮カラーを差し替えられる(マルチプレイの色選択)
+function buildGoreTexture(bright, pal) {
   const cv = document.createElement('canvas');
   cv.width = 512;
   cv.height = 64;
   const ctx = cv.getContext('2d');
   const gores = 16, w = 512 / gores;
-  const cols = bright ? ['#e0584a', '#c94434'] : ['#c62828', '#a81f1f'];
-  const seam = bright ? '#a83028' : '#7a1515';
+  const base = pal || { cols: ['#c62828', '#a81f1f'], seam: '#7a1515' };
+  const cols = bright ? base.cols.map((c) => lighten(c, 0.25)) : base.cols;
+  const seam = bright ? lighten(base.seam, 0.3) : base.seam;
   for (let i = 0; i < gores; i++) {
     ctx.fillStyle = cols[i % 2];
     ctx.fillRect(i * w, 0, w, 64);
@@ -232,9 +260,9 @@ function buildBalloon() {
 
   // スカート(球皮の口からバーナー上方へ絞る布)。上端半径3.0は球皮の
   // y=7.0における断面半径と一致させ、継ぎ目が浮かないようにしている
+  const skirtMat = new THREE.MeshLambertMaterial({ color: 0xb52a2a, side: THREE.DoubleSide });
   const skirt = new THREE.Mesh(
-    new THREE.CylinderGeometry(3.0, 1.5, 3.2, 20, 1, true),
-    new THREE.MeshLambertMaterial({ color: 0xb52a2a, side: THREE.DoubleSide }));
+    new THREE.CylinderGeometry(3.0, 1.5, 3.2, 20, 1, true), skirtMat);
   skirt.position.y = 5.4;
   g.add(skirt);
 
@@ -314,7 +342,7 @@ function buildBalloon() {
   const flameLight = new THREE.PointLight(0xffa040, 0, 60);
   flameLight.position.y = BURNER_Y + 1.1;
   g.add(flameLight);
-  return { group: g, flame, flameLight, envInnerMat, rope, ropeBaseY };
+  return { group: g, flame, flameLight, envMat, envInnerMat, skirtMat, rope, ropeBaseY };
 }
 
 // ---- 気球の擬似影 ----
@@ -375,7 +403,9 @@ function applyTargetColor(active) {
 }
 
 // ---- マーカー(重り+リボン+視認用グロー) ----
-function buildMarkerMesh() {
+// ribbonColor: 他プレイヤーのゴーストマーカーを見分けやすくするための任意指定
+// (自機のマーカーは常定色のまま。省略時はデフォルトの黄リボン)
+function buildMarkerMesh(ribbonColor) {
   const g = new THREE.Group();
   const weight = new THREE.Mesh(
     new THREE.SphereGeometry(0.3, 10, 8),
@@ -383,7 +413,7 @@ function buildMarkerMesh() {
   g.add(weight);
   const ribbon = new THREE.Mesh(
     new THREE.PlaneGeometry(0.5, 4.5),
-    new THREE.MeshBasicMaterial({ color: 0xffee58, side: THREE.DoubleSide }));
+    new THREE.MeshBasicMaterial({ color: ribbonColor ?? 0xffee58, side: THREE.DoubleSide }));
   ribbon.position.y = 2.6;
   g.add(ribbon);
   // 落下中でも見失わないよう、常にカメラを向く淡い光のスプライトを重ねる
@@ -488,6 +518,25 @@ const LOOK_SPEED = 0.0038;
 const PITCH_LIMIT = THREE.MathUtils.degToRad(85);
 const look = { dragging: false, lastX: 0, lastY: 0 };
 
+function setTimeScale(v) {
+  // マルチプレイでは「希望」をサーバーへ送るだけ。実際の反映は合意値(scale配信)を待つ
+  if (MP.room) {
+    MP.desired = v;
+    MP.room.sendSpeed(v);
+    mpRenderBoard();
+    return;
+  }
+  timeScale = v;
+  document.getElementById('tscale').textContent = v;
+}
+
+// 合意タイムスケールの反映(実際のシミュレーション速度はこの値だけが変える)
+function applyServerScale(v) {
+  timeScale = v;
+  document.getElementById('tscale').textContent = v;
+  mpRenderBoard();
+}
+
 addEventListener('keydown', (e) => {
   if (e.code === 'Space') { input.burner = true; e.preventDefault(); }
   if (e.code === 'KeyR') input.rip = true;
@@ -510,8 +559,7 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyG' && started) reportGroundCrew();
   if (e.code === 'KeyS') toggleSound();
   if (e.code >= 'Digit1' && e.code <= 'Digit4') {
-    timeScale = [1, 2, 4, 8][Number(e.code.slice(5)) - 1];
-    document.getElementById('tscale').textContent = timeScale;
+    setTimeScale([1, 2, 4, 8][Number(e.code.slice(5)) - 1]);
   }
 });
 addEventListener('keyup', (e) => {
@@ -746,8 +794,21 @@ function setupAreaMap(onSelect) {
 }
 
 // ---- メイン ----
-AREA = decodeArea(new URLSearchParams(location.search).get('a'));
-if (!AREA) AREA = await selectArea();
+// ?room= 付きで開いた場合はゲスト入室: 接続してホストの条件(エリア・風)を受け取る
+const MP_JOIN_CODE = (new URLSearchParams(location.search).get('room') || '').toUpperCase();
+if (MP_JOIN_CODE) {
+  const setup = await mpJoinGate(MP_JOIN_CODE);
+  AREA = setup.area;
+  PIBAL = setup.wind.map(toRowObj);
+  // groundWind: ホストが決めた値をここでも直接反映する(mpWireRoom内のsetupリスナーは
+  // 初回のこの受け渡し完了後に登録されるため、初回分はここで拾う必要がある)
+  groundWind = setup.groundWind ? { ...setup.groundWind } : null;
+  if (groundWind) groundWind.launchGround = groundWindActual(0);
+  MP.isResuming = false; // 復帰処理はここで完了。以降の計測等は通常どおりの演出に戻す
+} else {
+  AREA = decodeArea(new URLSearchParams(location.search).get('a'));
+  if (!AREA) AREA = await selectArea();
+}
 
 const loadingEl = document.getElementById('loading');
 document.getElementById('load-title').textContent =
@@ -835,7 +896,12 @@ document.getElementById('result-share').addEventListener('click', (e) => copySha
 
 const launchSel = { x: null, z: null };
 setupLaunchMap();
-document.getElementById('briefing').style.display = '';
+// 飛行中/リザルト中への復帰(フルリロード後)はソロと同じブリーフィング(離陸地点の
+// 選び直し等)を出さない。mp-rematch等のボタン配線は必要なのでmpBriefingInit()自体は呼ぶ
+if (!MP.room || MP.resumeState === 'lobby') {
+  document.getElementById('briefing').style.display = '';
+}
+mpBriefingInit();
 
 // ブリーフィング地図: ズーム(ホイール)+パン(ドラッグ)可能な簡易スリッピーマップ。
 // ズームに応じて標準地図タイルを z11〜z17 から選んで表示する
@@ -963,7 +1029,8 @@ function setupLaunchMap() {
       const btn = document.getElementById('launch-btn');
       btn.disabled = false;
       const d = Math.hypot(launchSel.x - TARGET_XZ.x, launchSel.z - TARGET_XZ.z);
-      btn.textContent = `離陸!(ターゲットまで ${(d / 1000).toFixed(2)} km)`;
+      btn.textContent = mpLaunchLabel(d);
+      if (MP.room && MP.ready) { MP.room.sendUnready(); MP.ready = false; } // 地点変更で準備解除
     }
     drag = null;
   });
@@ -985,6 +1052,7 @@ function setupLaunchMap() {
 
 document.getElementById('launch-btn').addEventListener('click', () => {
   if (launchSel.x === null) return;
+  if (MP.room) { mpToggleReady(); return; } // マルチプレイは準備完了→ホスト開始→同時離陸
   applyWindFromEditor(); // 離陸時点のエディタ内容で風を確定
   if (document.getElementById('gw-enable').checked) {
     const distKm = Math.max(0, Number(document.getElementById('gw-dist').value) || 0);
@@ -1058,6 +1126,8 @@ function dropMarker() {
   markerTrailElapsed = 0;
   // 各サンプルにその瞬間の気球位置(balloonPos)も記録し、リプレイで気球ごと再現できるようにする
   markerTrail = [{ t: 0, pos: marker.state.pos.clone(), balloonPos: state.pos.clone() }];
+  MP.myDropped = true;
+  if (MP.room) MP.room.sendDrop(); // スコアボードの「投下✓」用
 }
 
 // rawDt: 実時間の経過秒(タイムスケールの影響を受けない)。リプレイの記録専用
@@ -1102,10 +1172,13 @@ function onMarkerLanded(pos) {
   measureLine = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0x29e0ff }));
   scene.add(measureLine);
   document.getElementById('marker-info').textContent = '計測中...';
+  MP.myDist = dist;
+  if (MP.room) MP.room.sendLanded(dist); // 演出の3秒を待たず、着地の瞬間にサーバーへ確定距離を送る
   setTimeout(() => showResult(dist, null), RESULT_SUSPENSE_MS);
 }
 
 function showResult(dist, note) {
+  if (MP.resultsShown) return; // 全員確定の順位表が出た後は個人リザルトを重ねない
   const prev = Number(localStorage.getItem(BEST_KEY));
   const isBest = !Number.isFinite(prev) || prev <= 0 || dist < prev;
   if (isBest) localStorage.setItem(BEST_KEY, dist.toFixed(1));
@@ -1113,6 +1186,11 @@ function showResult(dist, note) {
   const subs = [];
   if (note) subs.push(note);
   subs.push(isBest ? '自己ベスト更新!' : `自己ベスト: ${Number(prev).toFixed(1)} m`);
+  if (MP.room) {
+    subs.push('🎈 全員の計測を待っています…');
+    document.getElementById('result-retry').style.display = 'none';
+    document.getElementById('result-share').style.display = 'none';
+  }
   document.getElementById('result-dist').textContent = dist.toFixed(1);
   document.getElementById('result-sub').innerHTML = subs.join('<br>');
   document.getElementById('result').style.display = '';
@@ -1213,6 +1291,7 @@ function stepClock(dt) {
   const ss = String(Math.floor(remaining % 60)).padStart(2, '0');
   hud.clock.textContent = `${mm}:${ss}`;
   if (remaining <= 0) {
+    if (MP.room) return; // マルチプレイの時間切れはサーバーのtimeup配信に従う(mpOnTimeup)
     expired = true;
     if (!marker.state) {
       marker.available = 0;
@@ -1439,6 +1518,13 @@ renderer.setAnimationLoop(() => {
     updateHud(w);
     drawCompass();
 
+    // マルチプレイ: 自機位置を送信(送信間隔はnet.js側で調整)し、他機のゴーストを補間表示
+    if (MP.room) {
+      MP.room.sendPos(state.pos.x, state.pos.y, state.pos.z);
+      updateGhosts(rawDt); // 位置の補間自体は見た目のなめらかさ優先で実時間のまま
+      updateGhostMarkers(dt); // マーカーの落下物理は合意タイムスケールに揃える(自機と同じ速さで見える)
+    }
+
     // 気球の近くの地面を段階的に高解像度化(1.5秒おきに1枚ずつ)。
     // 低高度では直下の1タイルだけさらにz17(≒1m/px)へ
     if (performance.now() - lastDetailCheck > 1500) {
@@ -1452,3 +1538,660 @@ renderer.setAnimationLoop(() => {
   if (!fpv) controls.update();
   renderer.render(scene, camera);
 });
+
+// ==== マルチプレイ(みんなで飛ぶ) ====================================
+// ゴーストバルーン方式: 物理は自機のみ計算し、他機はサーバー経由の位置を補間表示する。
+// プロトコルとサーバー実装は ../server/ を参照。ソロプレイでは MP.room が null のまま、
+// このセクションの関数は何もしない(または呼ばれない)。
+
+// 他プレイヤー名をinnerHTMLに混ぜるためのエスケープ。
+// この節はファイル途中のtop-level awaitより後に評価されるため、
+// それ以前に呼ばれても参照できるよう関数宣言(巻き上げあり)にしている
+function esc(s) {
+  return String(s).replace(/[&<>"']/g,
+    (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+function mpStatus(s) { document.getElementById('mp-status').textContent = s; }
+
+function mpInviteUrl(code) {
+  const server = new URLSearchParams(location.search).get('server');
+  return `${location.origin}${location.pathname}?room=${code}`
+    + (server ? `&server=${encodeURIComponent(server)}` : '');
+}
+
+function mpLaunchLabel(d) {
+  const km = (d / 1000).toFixed(2);
+  return MP.room ? `準備完了にする(ターゲットまで ${km} km)` : `離陸!(ターゲットまで ${km} km)`;
+}
+
+// 色パレットを描画し、クリックで選択(初期値はランダム)
+function mpRenderColors(containerId, initial) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = BALLOON_COLORS
+    .map((c, i) => `<button type="button" data-i="${i}" title="${c.name}" style="background:${c.ui}"></button>`)
+    .join('');
+  const select = (i) => {
+    MP.myColor = i;
+    [...el.children].forEach((b, j) => b.classList.toggle('sel', j === i));
+  };
+  el.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-i]');
+    if (b) select(Number(b.dataset.i));
+  });
+  select(Number.isInteger(initial) ? initial : Math.floor(Math.random() * BALLOON_COLORS.length));
+}
+
+// ゲスト入室ゲート(?room= 付きで開いたとき、地形読み込みより先に呼ばれる)。
+// 名前と色を決めて接続し、ホストの条件(エリア・風)を返す
+async function mpJoinGate(code) {
+  MP.code = code;
+  const params = new URLSearchParams(location.search);
+  const autoName = (params.get('n') || '').trim().slice(0, 12);
+  const cParam = Number(params.get('c'));
+  const initColor = Number.isInteger(cParam) && cParam >= 0 && cParam < BALLOON_COLORS.length
+    ? cParam : undefined;
+
+  const overlay = document.getElementById('mp-join');
+  document.getElementById('mp-join-code').textContent = code;
+  mpRenderColors('mp-join-colors', initColor);
+  const nameIn = document.getElementById('mp-join-name');
+  nameIn.value = autoName;
+  const statusEl = document.getElementById('mp-join-status');
+  const goBtn = document.getElementById('mp-join-go');
+  overlay.style.display = 'flex';
+
+  const tryConnect = async () => {
+    const name = nameIn.value.trim().slice(0, 12);
+    if (!name) { statusEl.textContent = 'パイロット名を入力してください'; return null; }
+    goBtn.disabled = true;
+    statusEl.textContent = '接続中…';
+    const room = new Room();
+    try {
+      await room.connect({ code, name, color: MP.myColor, create: false });
+      MP.room = room;
+      MP.myName = name;
+      return room;
+    } catch (err) {
+      goBtn.disabled = false;
+      statusEl.innerHTML =
+        `⚠ ${esc(err.message)} <a href="${location.pathname}" style="color:#9ecfff">ソロで飛ぶ</a>`;
+      return null;
+    }
+  };
+
+  let room = null;
+  const waitClickAndConnect = async () => {
+    while (!room) {
+      await new Promise((resolve) => { goBtn.onclick = resolve; });
+      room = await tryConnect();
+    }
+  };
+  // 切断時の入り直し: しばらく自動で試し、ダメなら「参加する」ボタン待ちに戻す
+  const reconnectLoop = async () => {
+    for (let i = 0; i < 8 && !room; i++) {
+      await new Promise((r) => setTimeout(r, 1500));
+      room = await tryConnect();
+    }
+    await waitClickAndConnect();
+  };
+
+  if (autoName) room = await tryConnect(); // 再戦後の自動再入室(URLに名前と色を引き継いでいる)
+  await waitClickAndConnect();
+
+  // 手入力で初参加した場合もURLに名前・色を反映しておく(事故リロード対策。
+  // 再戦時の自動再入室と同じ仕組みに乗せる)
+  if (!autoName) {
+    const mpUrl = new URL(location.href);
+    mpUrl.searchParams.set('n', MP.myName);
+    mpUrl.searchParams.set('c', String(MP.myColor));
+    history.replaceState(null, '', mpUrl);
+  }
+
+  // フルリロード後の復帰かどうかをここで確定する。helloのstateがlobby以外なら、
+  // ソロと同じブリーフィング画面(離陸地点の選び直し等)は出さずその場で再開する
+  MP.resumeState = room.hello.state;
+  MP.launch = room.hello.launch || null;
+  MP.isResuming = MP.resumeState !== 'lobby';
+
+  // ホストの条件配布を待つ。待機中にアプリ切替等で切断されたら入り直す
+  let setup = room.setup;
+  while (!setup) {
+    statusEl.textContent = 'ホストの条件配布を待っています…';
+    const ev = await new Promise((resolve) => {
+      room.on('setup', (s) => resolve({ setup: s }));
+      room.on('close', () => resolve({}));
+    });
+    if (ev.setup) { setup = ev.setup; break; }
+    statusEl.textContent = '⚠ 接続が切れました。再接続しています…';
+    room = null;
+    MP.room = null;
+    await reconnectLoop();
+    setup = room.setup;
+  }
+  mpWireRoom(); // setup待ちの仮ハンドラを本ハンドラで置き換える
+
+  // リザルト画面への復帰: resultsイベント(mpWireRoom登録直後にサーバーから届く)を
+  // 待ってから合流する。isResuming中は演出の3秒待ちを省略するようmpShowResults側で分岐する
+  if (MP.resumeState === 'results' && !MP.resultsShown) {
+    await new Promise((resolve) => {
+      const iv = setInterval(() => { if (MP.resultsShown) { clearInterval(iv); resolve(); } }, 50);
+      setTimeout(() => { clearInterval(iv); resolve(); }, 3000); // 保険(万一届かなくても先に進む)
+    });
+  }
+
+  overlay.style.display = 'none';
+  return setup;
+}
+
+// ブリーフィング表示後に呼ばれる。ホスト用の作成UIとゲスト用のロビーを整える
+function mpBriefingInit() {
+  if (MP.room) {
+    // ゲスト: 入室済み。条件は編集不可、準備完了フローへ
+    document.getElementById('mp-entry').style.display = 'none';
+    document.getElementById('mp-room-code').textContent = MP.code;
+    document.getElementById('mp-lobby').style.display = '';
+    mpLockWind();
+    mpRenderGroundWindUI();
+    mpRenderRoster();
+  } else {
+    mpRenderColors('mp-colors');
+    document.getElementById('mp-create').addEventListener('click', mpCreateRoom);
+    document.getElementById('mp-join-btn').addEventListener('click', () => {
+      const code = document.getElementById('mp-code-in').value.trim().toUpperCase();
+      const name = document.getElementById('mp-name').value.trim().slice(0, 12);
+      if (!/^[A-Z0-9]{4,8}$/.test(code)) { mpStatus('ルームコードを入力してください'); return; }
+      if (!name) { mpStatus('パイロット名を入力してください'); return; }
+      location.href = `${mpInviteUrl(code)}&n=${encodeURIComponent(name)}&c=${MP.myColor}`;
+    });
+  }
+  document.getElementById('mp-copy').addEventListener('click', (e) => {
+    navigator.clipboard.writeText(mpInviteUrl(MP.code))
+      .then(() => { e.target.textContent = 'コピーしました!'; })
+      .catch(() => { e.target.textContent = 'コピー失敗'; })
+      .finally(() => setTimeout(() => { e.target.textContent = '招待URLをコピー'; }, 1600));
+  });
+  document.getElementById('mp-start').addEventListener('click', () => { if (MP.room) MP.room.sendStart(); });
+  document.getElementById('mp-rematch').addEventListener('click', () => {
+    // リザルト画面を見ている間に接続が切れていることがある(アプリ切替等)。
+    // その場合は繋ぎ直してから再戦を送る
+    if (MP.room && MP.room.alive) {
+      MP.room.sendRematch();
+      return;
+    }
+    MP.pendingRematch = true;
+    document.getElementById('mp-results-note').textContent = '再接続しています…';
+    mpTryReconnect();
+  });
+}
+
+// ホストとしてルームを作成し、現在の条件(エリア・風)を配布する
+async function mpCreateRoom() {
+  const name = document.getElementById('mp-name').value.trim().slice(0, 12);
+  if (!name) { mpStatus('パイロット名を入力してください'); return; }
+  mpStatus('接続中…');
+  const code = randomRoomCode();
+  const room = new Room();
+  try {
+    await room.connect({ code, name, color: MP.myColor, create: true });
+  } catch (err) {
+    mpStatus(`⚠ 接続できませんでした(${err.message})`);
+    return;
+  }
+  MP.room = room;
+  MP.code = code;
+  MP.myName = name;
+  MP.isCreator = true;
+  mpWireRoom();
+  // 事故リロード対策: URLに?room=を反映しておく。誤ってリロードボタンを押しても
+  // 通常のゲスト参加と同じ復帰ゲート(mpJoinGate)を通り、ソロの新規ゲームに
+  // 迷い込まず同じルームへ戻れるようにする
+  const mpUrl = new URL(location.href);
+  mpUrl.searchParams.set('room', code);
+  mpUrl.searchParams.set('n', name);
+  mpUrl.searchParams.set('c', String(MP.myColor));
+  history.replaceState(null, '', mpUrl);
+  applyWindFromEditor(); // エディタの内容で風を確定してから配布(以後は編集不可)
+  let gwPayload = null;
+  if (document.getElementById('gw-enable').checked) {
+    const distKm = Math.max(0, Number(document.getElementById('gw-dist').value) || 0);
+    gwPayload = rollGroundWind(distKm); // 隠しパラメータはホストが1回だけ決め、全員で共有する
+  }
+  room.sendSetup(AREA, PIBAL.map((r) => [r.ft, r.dir, r.kt]), gwPayload);
+  mpLockWind();
+  document.getElementById('mp-entry').style.display = 'none';
+  document.getElementById('mp-room-code').textContent = code;
+  document.getElementById('mp-lobby').style.display = '';
+  mpStatus('招待URLを友達に送ってください');
+  if (launchSel.x !== null) {
+    const d = Math.hypot(launchSel.x - TARGET_XZ.x, launchSel.z - TARGET_XZ.z);
+    document.getElementById('launch-btn').textContent = mpLaunchLabel(d);
+  }
+  mpRenderRoster();
+}
+
+// ルーム作成後・入室後は風条件を全員で共有するため編集を止める
+function mpLockWind() {
+  const tools = document.querySelector('.wind-tools');
+  if (tools) tools.style.display = 'none';
+  for (const el of document.querySelectorAll('#wind-editor input')) el.disabled = true;
+  for (const el of document.querySelectorAll('#wind-editor .del')) el.style.display = 'none';
+  // 地上風のゆらぎはホストが決めた値を全員で共有するため編集を止める(表示自体は残す)
+  document.getElementById('gw-enable').disabled = true;
+  document.getElementById('gw-dist').disabled = true;
+}
+
+// groundWind(共有済みの状態)に合わせて、ブリーフィングのトグル/距離表示を更新する。
+// ホスト・ゲスト共通(サーバーから届いたsetupをそのまま反映するだけ)
+function mpRenderGroundWindUI() {
+  const on = !!groundWind;
+  document.getElementById('gw-enable').checked = on;
+  document.getElementById('gw-dist-row').style.display = on ? 'flex' : 'none';
+  document.getElementById('gw-dist-hint').style.display = on ? 'block' : 'none';
+  if (on) document.getElementById('gw-dist').value = groundWind.distKm;
+}
+
+function mpToggleReady() {
+  const btn = document.getElementById('launch-btn');
+  if (!MP.ready) {
+    MP.launch = { x: launchSel.x, z: launchSel.z };
+    MP.room.sendReady(MP.launch);
+    MP.ready = true;
+    btn.textContent = '✅ 準備完了(クリックで取り消し)';
+  } else {
+    MP.room.sendUnready();
+    MP.ready = false;
+    const d = Math.hypot(launchSel.x - TARGET_XZ.x, launchSel.z - TARGET_XZ.z);
+    btn.textContent = mpLaunchLabel(d);
+  }
+}
+
+// サーバーからのイベントをUIへ配線する(ホスト・ゲスト共通)
+function mpWireRoom() {
+  const room = MP.room;
+  room.on('roster', mpRenderRoster);
+  room.on('setup', (s) => {
+    PIBAL = s.wind.map(toRowObj);
+    renderEditorRows(PIBAL);
+    // groundWindはホストが1回だけ決めた値がそのまま届く(自分では乱数を引き直さない)。
+    // launchGroundは共有パラメータだけで決まる純粋な値なので、いつ計算しても同じ結果になる
+    groundWind = s.groundWind ? { ...s.groundWind } : null;
+    if (groundWind) groundWind.launchGround = groundWindActual(0);
+    mpLockWind();
+    mpRenderGroundWindUI();
+    renderFlightPibal();
+  });
+  room.on('countdown', mpCountdown);
+  room.on('drop', onGhostDrop);
+  room.on('snap', (m) => {
+    if (started) remaining = Math.max(0, m.clock); // サーバーの時計を正とする
+    if (m.scale !== timeScale) applyServerScale(m.scale);
+  });
+  room.on('scale', applyServerScale);
+  room.on('timeup', mpOnTimeup);
+  room.on('results', (rows) => {
+    // 復帰時(自分の着地演出ではない)は3秒の余韻を挟まず即座に見せる
+    setTimeout(() => mpShowResults(rows), MP.isResuming ? 0 : RESULT_SUSPENSE_MS);
+  });
+  room.on('rematch', () => {
+    // もう一回戦: 同じルームコードで同名・同色のまま再入室(条件はサーバーが保持)
+    location.href = `${mpInviteUrl(MP.code)}&n=${encodeURIComponent(MP.myName)}&c=${MP.myColor}`;
+  });
+  room.on('error', (m) => mpStatus(`⚠ ${m.msg || m.code}`));
+  room.on('close', () => {
+    if (room !== MP.room) return;
+    MP.room = null;
+    // どの局面でも自動で入り直す。切断は異常ではなく正常系として扱う。
+    // 飛行中・リザルト中はサーバー側が復帰猶予つきで席を保持している
+    if (!started && !MP.resultsShown) MP.ready = false;
+    mpScheduleReconnect(0);
+  });
+}
+
+// ---- 自動再接続(ロビー・飛行中・リザルト共通) ----
+const RECONNECT_DELAYS = [500, 1000, 2000, 4000, 8000, 8000, 8000, 8000];
+
+// 局面に応じた場所に再接続の状態を表示する
+function mpReconnectStatus(text) {
+  if (MP.resultsShown) {
+    document.getElementById('mp-results-note').textContent = text;
+  } else if (started) {
+    document.getElementById('mp-board').innerHTML = esc(text);
+  } else {
+    mpStatus(text);
+  }
+}
+
+function mpScheduleReconnect(attempt) {
+  if (attempt >= RECONNECT_DELAYS.length) {
+    // 諦めメッセージ(タブを再度アクティブにした際の再試行は続く)
+    mpReconnectStatus(started && !MP.resultsShown
+      ? '⚠ 再接続できませんでした(ソロで続行。タブを切り替えると再試行します)'
+      : '⚠ 再接続できませんでした。ページを再読み込みしてください');
+    return;
+  }
+  mpReconnectStatus('⚠ 接続が切れました。再接続しています…');
+  setTimeout(() => mpTryReconnect(attempt), RECONNECT_DELAYS[attempt]);
+}
+
+async function mpTryReconnect(attempt = 0) {
+  if (MP.room || MP.reconnecting || !MP.code) return;
+  MP.reconnecting = true;
+  const room = new Room();
+  try {
+    // 作成者はcreate=1で再入室(全員切断でルームが空になっていても作り直せる)。
+    // 飛行中・リザルト中は同名プレイヤーとしてサーバーが同じ機体に復帰させる
+    await room.connect({ code: MP.code, name: MP.myName, color: MP.myColor, create: MP.isCreator });
+    MP.room = room;
+    mpWireRoom();
+    if (!started && !MP.resultsShown) {
+      // ロビー: 準備完了はサーバー側でリセットされているので押し直せる状態に戻す
+      mpStatus('再接続しました');
+      if (launchSel.x !== null) {
+        const d = Math.hypot(launchSel.x - TARGET_XZ.x, launchSel.z - TARGET_XZ.z);
+        const btn = document.getElementById('launch-btn');
+        btn.textContent = mpLaunchLabel(d);
+        btn.disabled = false;
+      }
+      // 自分がホストに戻った場合は条件を配り直す(空ルームを作り直したケース)。
+      // 地上風ゆらぎの隠しパラメータも、既に決まっている値をそのまま再送する(引き直さない)
+      if (MP.isCreator && room.isHost && !room.setup) {
+        room.sendSetup(AREA, PIBAL.map((r) => [r.ft, r.dir, r.kt]), groundWind);
+      }
+    } else {
+      // 飛行中/リザルト: 同じ機体への復帰。サーバーの時計・加速に合わせ直す
+      mpReconnectStatus('再接続しました');
+      if (room.hello && room.hello.clock != null && started && !MP.resultsShown) {
+        remaining = Math.max(0, room.hello.clock);
+        if (room.hello.scale && room.hello.scale !== timeScale) applyServerScale(room.hello.scale);
+      }
+      // 切断中に進んだ自分の投下・計測をサーバーへ再送(サーバー側は重複を無視する)
+      if (MP.myDropped) room.sendDrop();
+      if (MP.myDist != null) room.sendLanded(MP.myDist);
+      if (MP.desired !== 1) room.sendSpeed(MP.desired);
+      if (MP.pendingRematch && room.isHost) {
+        room.sendRematch();
+        MP.pendingRematch = false;
+      }
+    }
+    mpRenderRoster();
+  } catch (err) {
+    mpScheduleReconnect(attempt + 1);
+  } finally {
+    MP.reconnecting = false;
+  }
+}
+
+// タブが再度アクティブになった瞬間に即時再接続を試みる(バックオフ待ちをスキップ)
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && MP.code && !MP.room) mpTryReconnect();
+});
+
+// ロビーの在室者一覧+ホストの開始ボタン
+function mpRenderRoster() {
+  if (!MP.room) return;
+  const ps = MP.room.players;
+  document.getElementById('mp-roster').innerHTML = ps.map((p) =>
+    `<div><span class="chip" style="background:${BALLOON_COLORS[p.color].ui}"></span>` +
+    `${esc(p.name)}${p.host ? ' 👑' : ''}${p.id === MP.room.id ? '(自分)' : ''} ` +
+    `${p.ready ? '✅' : '…'}</div>`).join('');
+  const startBtn = document.getElementById('mp-start');
+  if (MP.room.isHost) {
+    startBtn.style.display = '';
+    const ok = ps.length >= 2 && ps.every((p) => p.ready);
+    startBtn.disabled = !ok;
+    startBtn.textContent = ok ? '🎈 一斉離陸スタート!'
+      : (ps.length < 2 ? '参加者を待っています(2人以上で開始)' : '全員の準備完了待ち');
+  } else {
+    startBtn.style.display = 'none';
+  }
+  mpRenderBoard();
+}
+
+// 飛行中のスコアボード(投下✓のみ。距離は全員確定まで見せない)
+function mpRenderBoard() {
+  if (!MP.room) return;
+  const el = document.getElementById('mp-board');
+  el.innerHTML =
+    `<div style="color:#9ecfff">ルーム ${MP.code} / 加速 全体×${timeScale}(希望×${MP.desired})</div>` +
+    MP.room.players.map((p) =>
+      `<div><span class="chip" style="background:${BALLOON_COLORS[p.color].ui}"></span>` +
+      `${esc(p.name)} <span class="done">${p.connected === false ? '💤切断中'
+        : p.landed ? '📍計測済' : p.dropped ? '🎯投下' : ''}</span></div>`)
+      .join('');
+}
+
+// 選んだ球皮カラーを自機に反映する(球皮の外面・内面・スカート)
+function applyBalloonColor(idx) {
+  const c = BALLOON_COLORS[idx];
+  if (!c) return;
+  const pal = { cols: c.cols, seam: c.seam };
+  balloon.envMat.map = buildGoreTexture(false, pal);
+  balloon.envMat.needsUpdate = true;
+  balloon.envInnerMat.map = buildGoreTexture(true, pal);
+  balloon.envInnerMat.needsUpdate = true;
+  balloon.skirtMat.color.set(c.cols[1]);
+}
+
+// 同時離陸カウントダウン(サーバーからの相対時間inMsを使い、時計ずれの影響を受けない)
+function mpCountdown(m) {
+  document.getElementById('briefing').style.display = 'none';
+  applyBalloonColor(MP.myColor); // 自分の視点でも選んだ色の気球に乗る
+  const ov = document.getElementById('mp-countdown');
+  const numEl = document.getElementById('mp-countdown-num');
+  ov.style.display = 'flex';
+  const end = performance.now() + (m.inMs ?? 5000);
+  const iv = setInterval(() => {
+    const left = end - performance.now();
+    numEl.textContent = Math.max(0, Math.ceil(left / 1000));
+    if (left <= 0) {
+      clearInterval(iv);
+      ov.style.display = 'none';
+      renderFlightPibal();
+      const l = MP.launch || launchSel;
+      startFlight(l.x, l.z);
+      document.getElementById('mp-board').style.display = 'block';
+      mpRenderBoard();
+    }
+  }, 100);
+}
+
+// サーバーからの時間切れ。未投下なら現在地で計測して確定を送る
+function mpOnTimeup() {
+  remaining = 0;
+  if (expired) return;
+  expired = true;
+  if (!marker.state) {
+    marker.available = 0;
+    const d = Math.hypot(state.pos.x - TARGET_XZ.x, state.pos.z - TARGET_XZ.z);
+    MP.myDist = d;
+    if (MP.room) MP.room.sendLanded(d);
+    showResult(d, '制限時間切れ: 現在地点で計測');
+  }
+  // マーカー落下中なら着地時に onMarkerLanded が送信する
+}
+
+// 全員確定の順位表(実競技の成績発表)。ホストには「もう一回戦」を出す
+function mpShowResults(rows) {
+  MP.resultsShown = true;
+  document.getElementById('result').style.display = 'none';
+  document.getElementById('result-reopen').style.display = 'none'; // 隠していた場合の後始末
+  document.getElementById('mp-results-body').innerHTML = rows.map((r, i) =>
+    `<tr class="${i === 0 ? 'rank1' : ''}"><td>${i + 1}</td>` +
+    `<td><span class="chip" style="background:${BALLOON_COLORS[r.color].ui}"></span>` +
+    `${esc(r.name)}${r.left ? '(離脱)' : ''}${MP.room && r.id === MP.room.id ? ' ★' : ''}</td>` +
+    `<td class="num">${r.dist == null ? '—' : `${Number(r.dist).toFixed(1)} m`}</td></tr>`).join('');
+  document.getElementById('mp-results').style.display = 'block';
+  document.getElementById('mp-results-gw').textContent = `地上風ゆらぎ: ${groundWind ? '有効' : '無効'}`;
+  const rematchBtn = document.getElementById('mp-rematch');
+  const note = document.getElementById('mp-results-note');
+  if (MP.room && MP.room.isHost) {
+    rematchBtn.style.display = '';
+    note.textContent = '';
+  } else {
+    rematchBtn.style.display = 'none';
+    note.textContent = MP.room ? 'ホストの「もう一回戦」を待っています…'
+      : 'もう一度飛ぶにはページを再読み込みしてください';
+  }
+}
+
+// ---- ゴーストバルーン(他プレイヤーの気球) ----
+// 自機の詳細モデルより大幅に簡略化した表現(球皮+ゴンドラ+名前ラベル)。
+// 将来100機規模にする際は距離別にスプライトへ落とすLODをここに足す
+// (ghostMeshes本体はtop-level await中の切断にも耐えるようファイル先頭で宣言)
+
+function buildGhostBalloon(colorIdx, name) {
+  const c = BALLOON_COLORS[colorIdx] || BALLOON_COLORS[0];
+  const g = new THREE.Group(); // 原点=バスケット底面(自機と同じ基準)
+  const env = new THREE.Mesh(
+    new THREE.SphereGeometry(9, 16, 12),
+    new THREE.MeshLambertMaterial({ color: c.ui }));
+  env.scale.set(1, 1.12, 1);
+  env.position.y = 16.5;
+  g.add(env);
+  // スカート(自機と同じ寸法。濃い方の色で球皮と馴染ませる)
+  const skirt = new THREE.Mesh(
+    new THREE.CylinderGeometry(3.0, 1.5, 3.2, 12, 1, true),
+    new THREE.MeshLambertMaterial({ color: c.cols[1], side: THREE.DoubleSide }));
+  skirt.position.y = 5.4;
+  g.add(skirt);
+  const basket = new THREE.Mesh(
+    new THREE.BoxGeometry(1.4, 1.1, 1.4),
+    new THREE.MeshLambertMaterial({ color: 0x5d451f }));
+  basket.position.y = 0.55;
+  g.add(basket);
+  // 名前ラベル(常にカメラを向くスプライト。縁取りで地形に埋もれないように)
+  const cv = document.createElement('canvas');
+  cv.width = 256;
+  cv.height = 64;
+  const ctx = cv.getContext('2d');
+  ctx.font = 'bold 30px "Segoe UI", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+  ctx.strokeText(name, 128, 32);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(name, 128, 32);
+  const label = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false,
+  }));
+  label.scale.set(36, 9, 1);
+  label.position.y = 34;
+  g.add(label);
+  return g;
+}
+
+// 毎フレーム: 目標位置(最新位置+速度外挿)をなめらかに追いかける。
+// 目標へ即座に置くとスナップショット受信のたびにガタつくため、
+// 指数平滑で数百msかけて寄せる(厳密な位置より滑らかさを優先)
+const ghostTarget = new THREE.Vector3();
+function updateGhosts(rawDt) {
+  const samples = MP.room.sampleGhosts();
+  const alpha = 1 - Math.exp(-(rawDt || 0.016) * 5); // 時定数 約200ms
+  const seen = new Set();
+  for (const s of samples) {
+    seen.add(s.id);
+    let g = ghostMeshes.get(s.id);
+    if (!g) {
+      const pl = MP.room.players.find((p) => p.id === s.id);
+      g = buildGhostBalloon(pl ? pl.color : 0, pl ? pl.name : '???');
+      g.position.set(s.x, s.y, s.z); // 初回だけ直接置く
+      ghostMeshes.set(s.id, g);
+      scene.add(g);
+      continue;
+    }
+    g.position.lerp(ghostTarget.set(s.x, s.y, s.z), alpha);
+  }
+  for (const [id, g] of ghostMeshes) {
+    if (!seen.has(id)) {
+      scene.remove(g);
+      ghostMeshes.delete(id);
+      const gm = ghostMarkers.get(id); // 気球が消えたら(退室)そのマーカーも片付ける
+      if (gm) { scene.remove(gm.mesh); ghostMarkers.delete(id); }
+    }
+  }
+}
+
+// ---- 他プレイヤーのマーカー投下(見た目のみ。ターゲットまでの計測はしない) ----
+// サーバーは「誰が投下したか」しか知らないので、投下位置・初速はその瞬間の
+// ゴーストの推定位置・速度から作る。厳密さより「他の人も投げてる感」が目的
+function onGhostDrop(id) {
+  if (!MP.room || id === MP.room.id) return; // 自分の投下は既存のdropMarker()側で処理済み
+  if (ghostMarkers.has(id)) return; // 1本ルールなので二重生成しない
+  const snap = MP.room.ghostSnapshot(id);
+  if (!snap) return; // まだ位置を受信していない(ほぼ起きないはずだが念のため)
+  const pl = MP.room.players.find((p) => p.id === id);
+  const color = BALLOON_COLORS[pl ? pl.color : 0].ui;
+  const mesh = buildMarkerMesh(color);
+  mesh.position.set(snap.x, snap.y + 0.8, snap.z);
+  scene.add(mesh);
+  ghostMarkers.set(id, {
+    mesh, landed: false,
+    vel: new THREE.Vector3(snap.vx, snap.vy, snap.vz),
+  });
+}
+
+// 毎フレーム: 自機のstepMarker()と同じ物理(重力+風)で、他プレイヤーの
+// マーカーも見た目だけ落とす。着地したら地面に置いたまま静止させる
+function updateGhostMarkers(dt) {
+  for (const gm of ghostMarkers.values()) {
+    if (gm.landed) continue;
+    const p = gm.mesh.position;
+    const w = windAt(p.y);
+    gm.vel.y += (-9.81 - MARKER_DRAG * gm.vel.y) * dt;
+    gm.vel.x += ((w.vx - gm.vel.x) / MARKER_WIND_TAU) * dt;
+    gm.vel.z += ((w.vz - gm.vel.z) / MARKER_WIND_TAU) * dt;
+    p.addScaledVector(gm.vel, dt);
+    const ground = terrain.getHeight(p.x, p.z);
+    if (p.y <= ground) {
+      p.y = ground + 0.3;
+      gm.landed = true;
+    } else {
+      gm.mesh.rotation.y += 2 * dt; // リボンの回転(自機のマーカーと同じ演出)
+    }
+  }
+}
+
+// ---- フルリロード後の復帰(飛行中への再合流) ----
+// ?room=経由の再入室で、サーバーの局面がlobby以外だった場合はここで直接再開する。
+// (results中の復帰はmpJoinGate内でresultsイベントを待ってから合流済みなので、
+//  ここではflying/countdownへの復帰だけを扱う)
+if (MP.room && (MP.resumeState === 'flying' || MP.resumeState === 'countdown') && !MP.resultsShown) {
+  mpResumeFlight();
+}
+
+function mpResumeFlight() {
+  const l = MP.launch;
+  if (!l) return; // 離陸地点が無ければ復帰しない(readyしていれば必ずあるはずの想定)
+  startFlight(l.x, l.z);
+  const hello = MP.room.hello;
+  if (hello) {
+    if (hello.clock != null) remaining = Math.max(0, hello.clock);
+    if (hello.scale) applyServerScale(hello.scale);
+    // 切断時の位置から再開する(離陸地点からの仕切り直しを許すと、ゴールに
+    // 寄れなかった時にリロードで再トライするズルができてしまう)。
+    // 燃料・温度までは復元しないが、位置が戻らないので仕切り直しの旨味はない
+    if (hello.pos) {
+      const ground = terrain.getHeight(hello.pos.x, hello.pos.z);
+      state.pos.set(hello.pos.x, Math.max(hello.pos.y, ground), hello.pos.z);
+      state.vy = 0;
+      state.grounded = state.pos.y <= ground + 0.05;
+      balloon.group.position.copy(state.pos);
+      controls.target.copy(state.pos).add(new THREE.Vector3(0, 12, 0));
+      camera.position.copy(controls.target).add(new THREE.Vector3(60, 35, 60));
+      prevPos.copy(state.pos);
+      terrain.requestDetail(state.pos.x, state.pos.z);
+    }
+    // 投下済みで復帰した場合はマーカーを持たせない(投下し直しの防止。
+    // サーバー側も2回目のdrop/landedは無視するので順位への影響は元々ない)
+    if (hello.dropped || hello.landed) {
+      MP.myDropped = true;
+      marker.available = 0;
+      document.getElementById('marker-info').textContent =
+        hello.landed ? '計測済(リロード前に確定)' : '投下済';
+    }
+  }
+  document.getElementById('mp-board').style.display = 'block';
+  mpRenderBoard();
+}
