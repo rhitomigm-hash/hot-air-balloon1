@@ -3,7 +3,7 @@
 // ここでは接続・送受信・スナップショット補間だけを担当する。
 
 // デプロイ済みのWorkers URL(?server= で上書き可能。../server/README.md参照)
-const DEFAULT_SERVER = 'wss://balloon-multiplayer-public.rnogamigm.workers.dev';
+const DEFAULT_SERVER = 'wss://balloon-multiplayer-public.hotairballoongames2026.workers.dev';
 
 const POS_SEND_MS = 200;    // 自機位置の送信間隔(5Hz)
 const PREDICT_CAP_S = 0.6;  // スナップショット途絶時に速度外挿を続ける上限(秒)
