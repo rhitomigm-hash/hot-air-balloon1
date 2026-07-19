@@ -5,7 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>熱気球フライト(モバイル版)</title>
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden; background: #000;
+    /* iOSで長押しした時にコピー/検索の選択メニューが出るのを防ぐ(ゲーム画面全体で不要なため) */
+    -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
+  }
   #app { position: fixed; inset: 0; }
   #app canvas { touch-action: none; } /* ブラウザ既定のスクロール/ズームを無効化 */
   #area-map, #launch-map { touch-action: none; }
@@ -201,7 +205,9 @@
     font-size: 15px; border-color: #64b5f6; color: #90caf9;
   }
   #btn-marker {
-    right: 12px; bottom: 280px; width: 104px; height: 62px;
+    /* 狭い画面では音ON/地上クルーの列と重なっていたため、排気との間隔を詰めた
+       (元の隙間(54px)と重なり修正直後の隙間(14px)の中間くらいの34px) */
+    right: 12px; bottom: 260px; width: 104px; height: 62px;
     font-size: 14px; border-color: #ffd54f; color: #ffe082;
   }
   /* 画面幅に関わらず常に縦一列(TV等の大画面でも風データ等と重ならないように、
@@ -398,8 +404,8 @@
   <button id="btn-view" type="button" data-i18n="btn.view">視点</button>
   <button id="btn-speed" type="button"><span data-i18n="btn.speed">加速 ×</span><span id="tscale-btn">1</span></button>
   <button id="btn-pibal" type="button" data-i18n="btn.pibal">風データ</button>
-  <button id="btn-sound" type="button">音 ON</button>
   <button id="btn-groundcrew" type="button" style="display:none" data-i18n="gw.groundCrewBtn">地上クルー</button>
+  <button id="btn-sound" type="button">音 ON</button>
 </div>
 
 <div id="gw-report" class="panel"></div>
