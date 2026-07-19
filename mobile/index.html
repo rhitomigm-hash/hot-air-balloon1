@@ -5,7 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>熱気球フライト(モバイル版)</title>
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden; background: #000;
+    /* iOSで長押しした時にコピー/検索の選択メニューが出るのを防ぐ(ゲーム画面全体で不要なため) */
+    -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
+  }
   #app { position: fixed; inset: 0; }
   #app canvas { touch-action: none; } /* ブラウザ既定のスクロール/ズームを無効化 */
   #area-map, #launch-map { touch-action: none; }
