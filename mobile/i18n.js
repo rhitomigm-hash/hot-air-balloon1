@@ -72,6 +72,9 @@ const STR = {
     'result.launchDist': '離陸地点からゴールまで: {m} m',
     'result.gwOn': '地上風ゆらぎ: 有効',
     'result.gwOff': '地上風ゆらぎ: 無効',
+    'result.hideBtn': '隠す ▾',
+    'result.hideTitle': '結果を隠して周囲を見る',
+    'result.reopenBtn': '結果を表示 ▴',
     'copy.success': 'コピーしました!',
     'copy.fail': 'コピー失敗',
 
@@ -205,6 +208,9 @@ const STR = {
     'result.launchDist': 'Launch to goal: {m} m',
     'result.gwOn': 'Ground wind drift: On',
     'result.gwOff': 'Ground wind drift: Off',
+    'result.hideBtn': 'Hide ▾',
+    'result.hideTitle': 'Hide the result to look around',
+    'result.reopenBtn': 'Show Result ▴',
     'copy.success': 'Copied!',
     'copy.fail': 'Copy failed',
 

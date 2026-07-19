@@ -22,8 +22,15 @@
   #fuel-fill { background: #4caf50; }
   #heat-fill { background: #ff7043; }
   #pibal { top: 12px; right: 12px; }
+  #pibal .pibal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  #pibal .pibal-head b { font-size: 13px; line-height: 1.2; }
   #pibal table { border-collapse: collapse; font-family: Consolas, monospace; font-size: 12px; }
   #pibal th, #pibal td { padding: 2px 8px; text-align: right; border-bottom: 1px solid #345; }
+  #wind-mode-toggle {
+    border: 1px solid #4a6a8a; border-radius: 6px; background: rgba(15, 30, 45, 0.75);
+    color: #9ecfff; font-size: 11px; padding: 3px 8px; cursor: pointer;
+  }
+  #instruments .row.clickable { cursor: pointer; }
   #pibal .note { font-size: 10px; color: #9ab; margin-top: 4px; }
   /* 地上風ゆらぎONの時、地上行(0ft)は離陸時点の値のまま古くなっていく表現でグレーアウト */
   #pibal tr.gw-stale td { color: #6a7d8c; }
@@ -163,12 +170,13 @@
   <div class="row"><span>高度(MSL)</span><span class="num"><span id="alt-m">--</span> m</span></div>
   <div class="row"><span>対地高度</span><span class="num"><span id="agl">--</span> m</span></div>
   <div class="row"><span>昇降</span><span class="num"><span id="vario">--</span> m/s</span></div>
-  <div class="row"><span>風(現在高度)</span><span class="num" id="wind">---° / --kt</span></div>
+  <div class="row"><span id="wind-label">風(現在高度)</span><span class="num" id="wind">---° / --kt</span></div>
   <div class="row"><span>燃料</span><span class="num"><span id="fuel">100</span>%</span></div>
   <div class="bar"><div id="fuel-fill"></div></div>
   <div class="row"><span>エンベロープ温度</span></div>
   <div class="bar"><div id="heat-fill"></div></div>
   <div class="row"><span>時間加速</span><span class="num">×<span id="tscale">1</span></span></div>
+  <div class="row clickable" id="sound-row" title="クリックまたはSキーでミュート切替"><span>音</span><span class="num" id="sound-status">ON</span></div>
   <div class="row"><span>状態</span><span class="num" id="status">接地</span></div>
   <div class="row"><span>ターゲット</span><span class="num" id="target-info">---- m / ---°</span></div>
   <div class="row"><span>マーカー</span><span class="num" id="marker-info">残り 1</span></div>
@@ -262,12 +270,15 @@
 </div>
 
 <div id="pibal" class="panel">
-  <b>パイバル観測データ</b>
+  <div class="pibal-head">
+    <b>パイバル観測データ</b>
+    <button id="wind-mode-toggle" type="button">FROM</button>
+  </div>
   <table>
     <thead><tr><th>高度ft</th><th>風向°</th><th>風速kt</th></tr></thead>
     <tbody id="pibal-body"></tbody>
   </table>
-  <div class="note">高度: MSL / 風向: FROM(磁方位)<br>※磁気偏角は未考慮(プロトタイプ)</div>
+  <div class="note">高度: MSL / 風向: <span id="pibal-mode-label">FROM</span>(磁方位)<br>※磁気偏角は未考慮(プロトタイプ)</div>
 </div>
 
 <canvas id="compass" width="150" height="150"></canvas>
@@ -276,7 +287,7 @@
   <b>Space</b> バーナー(長押し) <b>R</b> リップライン(長押し) <b>M</b> マーカー投下<br>
   <b>V</b> 視点切替(ゴンドラ/外部) <b>1-4</b> 時間加速 ×1/×2/×4/×8<br>
   <b>P</b> パイバル表 表示/非表示 <b>G</b> 地上クルーに無線確認(ゆらぎ有効時)<br>
-  マウスドラッグ: 視点回転 / ホイール: ズーム
+  <b>S</b> 音のON/OFF マウスドラッグ: 視点回転 / ホイール: ズーム
 </div>
 
 <div id="gw-report" class="panel"></div>
