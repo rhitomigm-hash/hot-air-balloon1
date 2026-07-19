@@ -90,11 +90,58 @@ function windAt(x, z, altM) {
   const t = a === b ? 0 : (ft - a.ft) / (b.ft - a.ft);
   // 風向は最短の角度経路で補間(例: 350°→020° は北回り)
   const delta = ((b.dir - a.dir + 540) % 360) - 180;
-  const dir = (a.dir + delta * t + 360) % 360;
-  const kt = a.kt + (b.kt - a.kt) * t;
+  let dir = (a.dir + delta * t + 360) % 360;
+  let kt = a.kt + (b.kt - a.kt) * t;
+  if (groundWind && ft < GROUND_BAND_FT) {
+    const g = groundWindActual(TASK_LIMIT_S - remaining);
+    const k = 1 - ft / GROUND_BAND_FT; // 地表で1、GROUND_BAND_FTで0に薄れる
+    const gDelta = ((g.dir - dir + 540) % 360) - 180;
+    dir = (dir + gDelta * k + 360) % 360;
+    kt = kt + (g.kt - kt) * k;
+  }
   const toRad = ((dir + 180) * Math.PI) / 180; // FROM → 進行方向
   const ms = kt * KT2MS;
   return { dir, kt, vx: ms * Math.sin(toRad), vz: -ms * Math.cos(toRad) };
+}
+
+// ---- 地上風のゆらぎ(β)----
+// 高気圧との位置関係(距離のみ。方位は今回のバージョンでは扱わない)から、
+// 地上付近の風がパイバル表通りとは限らなくなる度合いを決める。実際の値は
+// 離陸時に1回だけ乱数で決まり、パイロットには数値として見せない
+// (「地上クルー」への無線確認、またはパネルの離陸時スナップショットでしか触れられない)
+const GROUND_BAND_FT = 500; // この高度(AGL)以下だけ実況値とブレンドし、以上は表通り
+const DIR_OSC_AMP_DEG = 7.5;   // 周期振動の振幅(振れ幅は約2倍の15°)
+const KT_OSC_AMP_FRAC = 0.3;   // 風速側の振動振幅(±30%)
+const GW_RANGES = [
+  { maxKm: 150, angMin: 15, angMax: 40, spdMin: 0.3, spdMax: 0.6 },
+  { maxKm: 400, angMin: 10, angMax: 25, spdMin: 0.45, spdMax: 0.7 },
+  { maxKm: Infinity, angMin: 5, angMax: 15, spdMin: 0.6, spdMax: 0.85 },
+];
+const randBetween = (lo, hi) => lo + Math.random() * (hi - lo);
+let groundWind = null; // 有効時のみ非nullのオブジェクト
+let gwReportTimer = null;
+
+// distKmはパイロットに公開される情報(表示用)。それ以外は隠しパラメータ
+function rollGroundWind(distKm) {
+  const rg = GW_RANGES.find((r) => distKm < r.maxKm);
+  const sign = Math.random() < 0.5 ? -1 : 1;
+  return {
+    distKm,
+    veerOffset: sign * randBetween(rg.angMin, rg.angMax),
+    speedFactor: randBetween(rg.spdMin, rg.spdMax),
+    dirPeriod: randBetween(240, 360), dirPhase: randBetween(0, Math.PI * 2),
+    ktPeriod: randBetween(240, 360), ktPhase: randBetween(0, Math.PI * 2),
+  };
+}
+
+// tSec: 離陸からのゲーム内経過秒。地上(0ft)の「本当の」風を返す(隠しパラメータ)
+function groundWindActual(tSec) {
+  const base = PIBAL[0];
+  const dirOsc = DIR_OSC_AMP_DEG * Math.sin((2 * Math.PI * tSec) / groundWind.dirPeriod + groundWind.dirPhase);
+  const dir = (base.dir + groundWind.veerOffset + dirOsc + 360) % 360;
+  const ktOsc = 1 + KT_OSC_AMP_FRAC * Math.sin((2 * Math.PI * tSec) / groundWind.ktPeriod + groundWind.ktPhase);
+  const kt = Math.max(0, base.kt * groundWind.speedFactor * ktOsc);
+  return { dir, kt };
 }
 
 // ---- three.js セットアップ ----
@@ -301,21 +348,36 @@ function buildShadowMesh() {
 }
 
 // ---- JDGターゲット(オレンジのX+白リング) ----
+// 地上風ゆらぎの有効/無効を、動画等で後から見ても一目で判別できるよう
+// ターゲットの色で対比させる(無効=暖色系、有効=寒色系)
+const TARGET_COLOR = {
+  off: { arm: 0xff5a00, ring: 0xffd54f }, // 暖色系(オレンジ×黄色)
+  on: { arm: 0x2979ff, ring: 0x00e676 },  // 寒色系(青×緑)
+};
+
 function buildTarget(x, z, groundY) {
   const g = new THREE.Group();
-  const armMat = new THREE.MeshBasicMaterial({ color: 0xff5a00 });
+  const armMat = new THREE.MeshBasicMaterial({ color: TARGET_COLOR.off.arm });
   for (const rot of [Math.PI / 4, -Math.PI / 4]) {
     const arm = new THREE.Mesh(new THREE.BoxGeometry(16, 0.2, 2.6), armMat);
     arm.rotation.y = rot;
     g.add(arm);
   }
-  const ring = new THREE.Mesh(
-    new THREE.RingGeometry(24, 25.5, 48),
-    new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide }));
+  const ringMat = new THREE.MeshBasicMaterial({ color: TARGET_COLOR.off.ring, side: THREE.DoubleSide });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(24, 25.5, 48), ringMat);
   ring.rotation.x = -Math.PI / 2;
   g.add(ring);
   g.position.set(x, groundY + 0.4, z);
+  g.userData.armMat = armMat;
+  g.userData.ringMat = ringMat;
   return g;
+}
+
+// 離陸時、地上風ゆらぎの有効/無効が確定してから呼ぶ
+function applyTargetColor(active) {
+  const c = active ? TARGET_COLOR.on : TARGET_COLOR.off;
+  target.userData.armMat.color.setHex(c.arm);
+  target.userData.ringMat.color.setHex(c.ring);
 }
 
 // ---- マーカー(重り+リボン+視認用グロー) ----
@@ -472,6 +534,8 @@ function togglePibal() {
   for (const id of ['btn-view', 'btn-speed', 'btn-pibal', 'btn-sound']) {
     document.getElementById(id).style.display = hidden ? 'none' : '';
   }
+  // 地上クルーボタンはパネルと同じ右上に重なるため、有効な時だけ連動して隠す
+  if (groundWind) document.getElementById('btn-groundcrew').style.display = hidden ? 'none' : '';
 }
 document.getElementById('pibal-close').addEventListener('click', togglePibal);
 
@@ -583,10 +647,37 @@ function toggleWindMode() {
 }
 document.getElementById('wind-mode-toggle').addEventListener('click', toggleWindMode);
 
+// ---- 地上風のゆらぎ: ブリーフィングのUI配線と「地上クルー」ボタン ----
+document.getElementById('gw-enable').addEventListener('change', (e) => {
+  const on = e.target.checked;
+  document.getElementById('gw-dist-row').style.display = on ? 'flex' : 'none';
+  document.getElementById('gw-dist-hint').style.display = on ? 'block' : 'none';
+});
+document.getElementById('btn-groundcrew').addEventListener('click', () => {
+  if (!groundWind) return;
+  const g = groundWindActual(TASK_LIMIT_S - remaining);
+  const toDir = Math.round((g.dir + 180) % 360);
+  const tier = g.kt < 3 ? t('gw.tierWeak') : g.kt < 8 ? t('gw.tierNormal') : t('gw.tierStrong');
+  const rep = document.getElementById('gw-report');
+  rep.innerHTML = `${t('gw.reportPrefix')}<br><b>${String(toDir).padStart(3, '0')}°</b> ${tier}`;
+  rep.style.display = 'block';
+  clearTimeout(gwReportTimer);
+  gwReportTimer = setTimeout(() => { rep.style.display = 'none'; }, 6000);
+});
+
 // ---- 飛行中HUDのパイバル表を描画 ----
 function renderFlightPibal() {
   document.getElementById('pibal-body').innerHTML = PIBAL
-    .map((r) => `<tr><td>${r.ft}</td><td>${String(Math.round(toDisplayDir(r.dir))).padStart(3, '0')}</td><td>${r.kt}</td></tr>`)
+    .map((r, i) => {
+      // 地上風ゆらぎON時の0ft行は、離陸時にパイロットが読んだ値のまま古びていく
+      // (現在値ではない)ことを示すため、離陸時スナップショットをグレーアウト表示する
+      if (i === 0 && groundWind) {
+        const g = groundWind.launchGround;
+        return `<tr class="gw-stale"><td>${r.ft}<span class="gw-stale-note">${t('pibal.launchTimeNote')}</span></td>` +
+          `<td>${String(Math.round(toDisplayDir(g.dir))).padStart(3, '0')}</td><td>${g.kt.toFixed(1)}</td></tr>`;
+      }
+      return `<tr><td>${r.ft}</td><td>${String(Math.round(toDisplayDir(r.dir))).padStart(3, '0')}</td><td>${r.kt}</td></tr>`;
+    })
     .join('');
 }
 renderFlightPibal();
@@ -1028,10 +1119,17 @@ function setupLaunchMap() {
 document.getElementById('launch-btn').addEventListener('click', () => {
   if (launchSel.x === null) return;
   applyWindFromEditor(); // 離陸時点のエディタ内容で風を確定
+  if (document.getElementById('gw-enable').checked) {
+    const distKm = Math.max(0, Number(document.getElementById('gw-dist').value) || 0);
+    groundWind = rollGroundWind(distKm);
+    groundWind.launchGround = groundWindActual(0); // 離陸時点(t=0)の実況値を凍結して保存
+    renderFlightPibal(); // グレーアウト行を反映
+  }
   startFlight(launchSel.x, launchSel.z);
 });
 
 function startFlight(x, z) {
+  applyTargetColor(!!groundWind);
   // 離陸地点とターゲット周辺は先に高解像度化しておく
   terrain.requestDetail(x, z);
   terrain.requestDetail(TARGET_XZ.x, TARGET_XZ.z);
@@ -1050,6 +1148,7 @@ function startFlight(x, z) {
     document.getElementById(id).style.display = 'flex';
   }
   document.getElementById('touch-tools').style.display = 'flex';
+  document.getElementById('btn-groundcrew').style.display = groundWind ? '' : 'none';
   document.getElementById('lang-toggle').style.display = 'none';
   flightReady = true;
   started = true;
@@ -1168,6 +1267,10 @@ function showResult(dist, note) {
   } else {
     launchInfo.style.display = 'none';
   }
+
+  // 地上風ゆらぎの有効/無効
+  document.getElementById('result-gw').textContent = groundWind ? t('result.gwOn') : t('result.gwOff');
+  document.getElementById('result-gw').style.display = '';
 
   // ターゲット至近(10m未満)なら、マーカー投下のリプレイボタンを出す
   const replayBtn = document.getElementById('result-replay');

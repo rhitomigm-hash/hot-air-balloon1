@@ -33,6 +33,10 @@
   #pibal table { border-collapse: collapse; font-family: Consolas, monospace; font-size: 12px; }
   #pibal th, #pibal td { padding: 2px 8px; text-align: right; border-bottom: 1px solid #345; }
   #pibal .note { font-size: 10px; color: #9ab; margin-top: 4px; line-height: 1.4; }
+  /* 地上風ゆらぎONの時、地上行(0ft)は離陸時点の値のまま古くなっていく表現でグレーアウト。
+     「離陸時」の注記はi18n対応のためCSSの::afterではなくJS側(renderFlightPibal)で付与する */
+  #pibal tr.gw-stale td { color: #6a7d8c; }
+  #pibal tr.gw-stale .gw-stale-note { font-size: 9px; }
   #wind-mode-toggle, #pibal-close {
     border: 1px solid #4a6a8a; border-radius: 6px; background: rgba(15, 30, 45, 0.75);
     color: #9ecfff; font-size: 11px; padding: 3px 8px; cursor: pointer;
@@ -156,6 +160,14 @@
   }
   .wind-tools select { flex: 1; }
   .b-hint { margin-top: 12px; font-size: 12px; color: #cdd9e4; line-height: 1.7; }
+  /* ---- 地上風のゆらぎ(β) ---- */
+  .gw-toggle { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .gw-row { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+  .gw-row input[type="number"] {
+    width: 70px; padding: 4px 6px; background: #0d1620; border: 1px solid #2a3a4a;
+    border-radius: 3px; color: #e8f0f6; font-family: Consolas, monospace; font-size: 13px;
+  }
+  .gw-hint { margin-top: 6px; font-size: 11px; color: #9ab; line-height: 1.6; }
   #launch-btn {
     margin-top: 16px; width: 100%; padding: 11px 0; border: 0; border-radius: 6px;
     background: #2e6da4; color: #fff; font-size: 15px; cursor: pointer;
@@ -203,6 +215,14 @@
     background: rgba(15, 30, 45, 0.75); color: #e8f0f6; font-size: 13px;
     user-select: none; -webkit-user-select: none; touch-action: manipulation;
   }
+  #btn-groundcrew { border-color: #81c784; color: #a5d6a7; }
+  /* 地上クルーからの無線報告。押すたびに更新し、鮮度が命なのでしばらくすると消える */
+  #gw-report {
+    top: 12px; left: 50%; transform: translateX(-50%); z-index: 6;
+    display: none; text-align: center; font-size: 13px; line-height: 1.6;
+    border: 1px solid #81c784; pointer-events: none;
+  }
+  #gw-report b { color: #a5d6a7; font-size: 15px; }
 
   /* ---- スマホ向けレイアウト調整 ---- */
   @media (max-width: 760px) {
@@ -306,6 +326,19 @@
           ターゲットの風上側に離陸地点を取り、高度で風を乗り換えて狙いましょう。<br>
           「条件URLをコピー」で、この風と同じ条件に挑戦できるURLを共有できます。
         </div>
+        <div class="b-sub" data-i18n="gw.sub">地上風のゆらぎ(β)</div>
+        <div class="gw-box">
+          <label class="gw-toggle"><input type="checkbox" id="gw-enable"> <span data-i18n="gw.enableLabel">有効にする</span></label>
+          <div class="gw-row" id="gw-dist-row" style="display:none">
+            <span data-i18n="gw.distLabel">高気圧までの距離</span>
+            <input type="number" id="gw-dist" min="0" step="10" value="300">
+            <span data-i18n="gw.distUnit">km</span>
+          </div>
+          <div class="gw-hint" id="gw-dist-hint" style="display:none" data-i18n-html="gw.hintHtml">
+            地上付近の風は表の値通りとは限りません。実際の値は離陸時に1回だけ決まり、パイロットには分かりません。
+            飛行中は「地上クルー」ボタンで無線確認できます(速度はおおよその感触のみ)。
+          </div>
+        </div>
         <button id="launch-btn" disabled data-i18n="launch.btnDefault">地図で離陸地点を選択してください</button>
       </div>
       <div class="b-right">
@@ -321,6 +354,7 @@
   <div class="r-dist"><span id="result-dist">--</span> m</div>
   <div class="r-sub" id="result-sub"></div>
   <div class="r-launch" id="result-launch" style="display:none"></div>
+  <div class="r-launch" id="result-gw" style="display:none"></div>
   <button id="result-retry" data-i18n="result.retryBtn">もう一度飛ぶ</button>
   <button id="result-share" data-i18n="wind.copyBtn">条件URLをコピー</button>
   <button id="result-replay" style="display:none" data-i18n="result.replayBtn">🎯 投下シーンをリプレイ</button>
@@ -365,7 +399,10 @@
   <button id="btn-speed" type="button"><span data-i18n="btn.speed">加速 ×</span><span id="tscale-btn">1</span></button>
   <button id="btn-pibal" type="button" data-i18n="btn.pibal">風データ</button>
   <button id="btn-sound" type="button">音 ON</button>
+  <button id="btn-groundcrew" type="button" style="display:none" data-i18n="gw.groundCrewBtn">地上クルー</button>
 </div>
+
+<div id="gw-report" class="panel"></div>
 
 <div id="help" class="panel" data-i18n-html="help.bodyHtml">
   <b>Space</b> バーナー(長押し) <b>R</b> リップライン(長押し) <b>M</b> マーカー投下<br>

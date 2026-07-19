@@ -70,8 +70,23 @@ const STR = {
     'result.bestExisting': '自己ベスト: {m} m',
     'result.timeExpired': '制限時間切れ: 現在地点で計測',
     'result.launchDist': '離陸地点からゴールまで: {m} m',
+    'result.gwOn': '地上風ゆらぎ: 有効',
+    'result.gwOff': '地上風ゆらぎ: 無効',
     'copy.success': 'コピーしました!',
     'copy.fail': 'コピー失敗',
+
+    'gw.sub': '地上風のゆらぎ(β)',
+    'gw.enableLabel': '有効にする',
+    'gw.distLabel': '高気圧までの距離',
+    'gw.distUnit': 'km',
+    'gw.hintHtml':
+      '地上付近の風は表の値通りとは限りません。実際の値は離陸時に1回だけ決まり、パイロットには分かりません。' +
+      '飛行中は「地上クルー」ボタンで無線確認できます(速度はおおよその感触のみ)。',
+    'gw.groundCrewBtn': '地上クルー',
+    'gw.reportPrefix': '📻 地上クルーより',
+    'gw.tierWeak': '弱い風',
+    'gw.tierNormal': '普通の風',
+    'gw.tierStrong': '強い風',
 
     'support.title': '🎈 日本代表を応援しよう!',
     'support.text1': '2026年9月、ポーランド🇵🇱クロスノで開催される熱気球世界選手権に、日本から7名のパイロットが日本代表として出場予定です。',
@@ -85,6 +100,7 @@ const STR = {
     'pibal.panelTitle': 'パイバル観測データ',
     'pibal.note': '高度: 対地(AGL) / 風向: <span id="pibal-mode-label">FROM</span>(磁方位)',
     'pibal.closeBtn': '閉じる ▲',
+    'pibal.launchTimeNote': ' (離陸時)',
 
     'btn.burnerHtml': '🔥<br>バーナー',
     'btn.rip': '排気',
@@ -187,8 +203,24 @@ const STR = {
     'result.bestExisting': 'Personal best: {m} m',
     'result.timeExpired': "Time's up: measured at current position",
     'result.launchDist': 'Launch to goal: {m} m',
+    'result.gwOn': 'Ground wind drift: On',
+    'result.gwOff': 'Ground wind drift: Off',
     'copy.success': 'Copied!',
     'copy.fail': 'Copy failed',
+
+    'gw.sub': 'Ground Wind Drift (beta)',
+    'gw.enableLabel': 'Enable',
+    'gw.distLabel': 'Distance to high-pressure center',
+    'gw.distUnit': 'km',
+    'gw.hintHtml':
+      'Ground-level wind may not match the table exactly. The actual value is set once at launch ' +
+      'and hidden from the pilot. During flight, use the "Ground Crew" button to radio for an update ' +
+      '(speed is only a rough estimate).',
+    'gw.groundCrewBtn': 'Ground Crew',
+    'gw.reportPrefix': '📻 From Ground Crew',
+    'gw.tierWeak': 'Light wind',
+    'gw.tierNormal': 'Moderate wind',
+    'gw.tierStrong': 'Strong wind',
 
     'support.title': '🎈 Cheer on Team Japan!',
     'support.text1': 'In September 2026, 7 pilots will represent Japan at the Hot Air Balloon World Championship in Krosno🇵🇱, Poland.',
@@ -202,6 +234,7 @@ const STR = {
     'pibal.panelTitle': 'Pibal Observation Data',
     'pibal.note': 'Alt: AGL / Dir: <span id="pibal-mode-label">FROM</span> (magnetic)',
     'pibal.closeBtn': 'Close ▲',
+    'pibal.launchTimeNote': ' (at launch)',
 
     'btn.burnerHtml': '🔥<br>Burner',
     'btn.rip': 'Vent',
