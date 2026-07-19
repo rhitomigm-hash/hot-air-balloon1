@@ -231,7 +231,7 @@ export class RoomCore {
     return { events: [{ to: 'all', msg: { t: 'setup', ...this.setup } }, this.rosterEvent()] };
   }
 
-  setReady(id, launch) {
+  setReady(id, launch, now) {
     const p = this.players.get(id);
     if (!p || this.state !== 'lobby') return { events: [] };
     if (!this.setup) return { error: { code: 'no_setup', msg: 'ホストの条件配布待ちです' } };
@@ -240,7 +240,15 @@ export class RoomCore {
     }
     p.ready = true;
     p.launch = { x: launch.x, z: launch.z };
-    return { events: [this.rosterEvent()] };
+    const events = [this.rosterEvent()];
+    // 公開版は同時飛行4機まで(サーバー負荷低減のため。将来的にサーバーを増強し次第、
+    // 上限は緩和する予定)。満室になった時点で全員準備完了なら、ホストの手動開始
+    // 操作を待たずに自動でカウントダウンへ入る
+    const all = [...this.players.values()];
+    if (this.players.size === this.maxPlayers && all.every((q) => q.ready)) {
+      events.push({ to: 'all', msg: this.beginCountdown(now) });
+    }
+    return { events };
   }
 
   setUnready(id) {
@@ -256,6 +264,12 @@ export class RoomCore {
     const all = [...this.players.values()];
     if (all.length < 2) return { error: { code: 'need_players', msg: '2人以上で開始できます' } };
     if (!all.every((p) => p.ready)) return { error: { code: 'not_ready', msg: '全員の準備完了待ちです' } };
+    return { events: [{ to: 'all', msg: this.beginCountdown(now) }] };
+  }
+
+  // ロビー→カウントダウンへの遷移そのもの。ホストの明示的なstart()と、
+  // 満室+全員準備完了による自動開始(setReady参照)の両方から呼ばれる
+  beginCountdown(now) {
     this.state = 'countdown';
     this.startAt = now + this.countdownMs;
     this.clock = this.taskSeconds;
@@ -265,7 +279,7 @@ export class RoomCore {
       p.desired = 1; p.dropped = false; p.landed = false; p.dist = null; p.lastSeen = now;
     }
     // inMs: 受信からの相対時間。クライアントの時計ずれの影響を受けないようこちらを使う
-    return { events: [{ to: 'all', msg: { t: 'countdown', startAt: this.startAt, inMs: this.countdownMs } }] };
+    return { t: 'countdown', startAt: this.startAt, inMs: this.countdownMs };
   }
 
   // ---- 飛行中 ----

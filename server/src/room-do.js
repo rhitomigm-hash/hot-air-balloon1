@@ -7,7 +7,9 @@ const TICK_MS = 250; // スナップショット配信間隔(4Hz)
 export class RoomDO {
   constructor(state, env) {
     this.state = state;
-    this.maxPlayers = Number(env.MAX_PLAYERS || 16);
+    // 公開版は同時飛行4機まで(サーバー負荷低減のため。将来的にサーバーを増強し次第、
+    // 上限は緩和する予定)。wrangler.toml の MAX_PLAYERS で上書きされる
+    this.maxPlayers = Number(env.MAX_PLAYERS || 4);
     this.core = new RoomCore({ maxPlayers: this.maxPlayers });
     this.sockets = new Map(); // playerId -> WebSocket
     this.interval = null;
@@ -91,7 +93,7 @@ export class RoomDO {
     switch (m.t) {
       case 'ping': return; // ロビー待機中のキープアライブ(応答不要)
       case 'setup': res = this.core.setSetup(id, { area: m.area, wind: m.wind, groundWind: m.groundWind }); break;
-      case 'ready': res = this.core.setReady(id, m.launch); break;
+      case 'ready': res = this.core.setReady(id, m.launch, now); break;
       case 'unready': res = this.core.setUnready(id); break;
       case 'start': res = this.core.start(id, now); break;
       case 'pos': res = this.core.pos(id, m.x, m.y, m.z, now, m.ts); break;

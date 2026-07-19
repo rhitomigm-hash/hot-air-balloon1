@@ -11,5 +11,6 @@ class_name = "RoomDO"
 tag = "v1"
 new_sqlite_classes = ["RoomDO"]
 
+# 公開版は同時飛行4機まで(サーバー負荷低減のため。将来的にサーバーを増強し次第、上限は緩和する予定)
 [vars]
-MAX_PLAYERS = "16"
+MAX_PLAYERS = "4"
