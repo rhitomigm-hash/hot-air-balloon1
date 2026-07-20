@@ -1554,9 +1554,13 @@ function esc(s) {
 
 function mpStatus(s) { document.getElementById('mp-status').textContent = s; }
 
-function mpInviteUrl(code) {
+// other=true で「もう一方の版」(PC版⇔スマホ版)へのURLを作る。ホストのいる版と
+// 招待相手が使う端末が一致するとは限らないため(例: PC版でルームを作りスマホの
+// 相手を招待すると、招待URLがPC版のまま届いて操作不能になっていた)
+function mpInviteUrl(code, other) {
   const server = new URLSearchParams(location.search).get('server');
-  return `${location.origin}${location.pathname}?room=${code}`
+  const path = other ? location.pathname.replace('/prototype/', '/mobile/') : location.pathname;
+  return `${location.origin}${path}?room=${code}`
     + (server ? `&server=${encodeURIComponent(server)}` : '');
 }
 
@@ -1710,6 +1714,12 @@ function mpBriefingInit() {
       .then(() => { e.target.textContent = 'コピーしました!'; })
       .catch(() => { e.target.textContent = 'コピー失敗'; })
       .finally(() => setTimeout(() => { e.target.textContent = '招待URLをコピー'; }, 1600));
+  });
+  document.getElementById('mp-copy-mobile').addEventListener('click', (e) => {
+    navigator.clipboard.writeText(mpInviteUrl(MP.code, true))
+      .then(() => { e.target.textContent = 'コピーしました!'; })
+      .catch(() => { e.target.textContent = 'コピー失敗'; })
+      .finally(() => setTimeout(() => { e.target.textContent = 'スマホの相手を招待するURLをコピー'; }, 1600));
   });
   document.getElementById('mp-start').addEventListener('click', () => { if (MP.room) MP.room.sendStart(); });
   document.getElementById('mp-rematch').addEventListener('click', () => {
