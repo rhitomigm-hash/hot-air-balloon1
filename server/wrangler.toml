@@ -14,3 +14,9 @@ new_sqlite_classes = ["RoomDO"]
 # 公開版は同時飛行4機まで(サーバー負荷低減のため。将来的にサーバーを増強し次第、上限は緩和する予定)
 [vars]
 MAX_PLAYERS = "4"
+
+# 例外調査のためダッシュボードから有効化したログ収集。ここに書いておかないと
+# 次回 wrangler deploy 時に enabled=false へ巻き戻ってしまうため設定ファイル側にも反映
+[observability.logs]
+enabled = true
+invocation_logs = true
