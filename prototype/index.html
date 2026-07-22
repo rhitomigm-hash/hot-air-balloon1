@@ -31,6 +31,11 @@
     color: #9ecfff; font-size: 11px; padding: 3px 8px; cursor: pointer;
   }
   #instruments .row.clickable { cursor: pointer; }
+  #lang-select {
+    position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 11;
+    border: 1px solid #4a6a8a; border-radius: 6px; background: rgba(15, 30, 45, 0.75);
+    color: #9ecfff; font-size: 12px; padding: 4px 8px; cursor: pointer;
+  }
   #pibal .note { font-size: 10px; color: #9ab; margin-top: 4px; }
   /* 地上風ゆらぎONの時、地上行(0ft)は離陸時点の値のまま古くなっていく表現でグレーアウト */
   #pibal tr.gw-stale td { color: #6a7d8c; }
@@ -243,105 +248,111 @@
 
 <div id="instruments" class="panel">
   <div class="alt-big"><span id="alt-ft">----</span> ft</div>
-  <div class="row"><span>高度(MSL)</span><span class="num"><span id="alt-m">--</span> m</span></div>
-  <div class="row"><span>対地高度</span><span class="num"><span id="agl">--</span> m</span></div>
-  <div class="row"><span>昇降</span><span class="num"><span id="vario">--</span> m/s</span></div>
-  <div class="row"><span id="wind-label">風(現在高度)</span><span class="num" id="wind">---° / --kt</span></div>
-  <div class="row"><span>燃料</span><span class="num"><span id="fuel">100</span>%</span></div>
+  <div class="row"><span data-i18n="hud.altMsl">高度(MSL)</span><span class="num"><span id="alt-m">--</span> m</span></div>
+  <div class="row"><span data-i18n="hud.agl">対地高度</span><span class="num"><span id="agl">--</span> m</span></div>
+  <div class="row"><span data-i18n="hud.vario">昇降</span><span class="num"><span id="vario">--</span> m/s</span></div>
+  <div class="row"><span id="wind-label" data-i18n="hud.windLabel">風(現在高度)</span><span class="num" id="wind">---° / --kt</span></div>
+  <div class="row"><span data-i18n="hud.fuel">燃料</span><span class="num"><span id="fuel">100</span>%</span></div>
   <div class="bar"><div id="fuel-fill"></div></div>
-  <div class="row"><span>エンベロープ温度</span></div>
+  <div class="row"><span data-i18n="hud.envelopeTemp">エンベロープ温度</span></div>
   <div class="bar"><div id="heat-fill"></div></div>
-  <div class="row"><span>時間加速</span><span class="num">×<span id="tscale">1</span></span></div>
-  <div class="row clickable" id="sound-row" title="クリックまたはSキーでミュート切替"><span>音</span><span class="num" id="sound-status">ON</span></div>
-  <div class="row"><span>状態</span><span class="num" id="status">接地</span></div>
-  <div class="row"><span>ターゲット</span><span class="num" id="target-info">---- m / ---°</span></div>
-  <div class="row"><span>マーカー</span><span class="num" id="marker-info">残り 1</span></div>
-  <div class="row"><span>残り時間</span><span class="num" id="clock">30:00</span></div>
+  <div class="row"><span data-i18n="hud.timeScale">時間加速</span><span class="num">×<span id="tscale">1</span></span></div>
+  <div class="row clickable" id="sound-row" data-i18n-attr="title:hud.soundTitle" title="クリックまたはSキーでミュート切替"><span data-i18n="hud.soundLabel">音</span><span class="num" id="sound-status" data-i18n="hud.soundOn">ON</span></div>
+  <div class="row"><span data-i18n="hud.status">状態</span><span class="num" id="status" data-i18n="hud.statusGrounded">接地</span></div>
+  <div class="row"><span data-i18n="hud.target">ターゲット</span><span class="num" id="target-info">---- m / ---°</span></div>
+  <div class="row"><span data-i18n="hud.marker">マーカー</span><span class="num" id="marker-info">残り 1</span></div>
+  <div class="row"><span data-i18n="hud.clockLabel">残り時間</span><span class="num" id="clock">30:00</span></div>
 </div>
+<select id="lang-select" aria-label="Language">
+  <option value="ja">日本語</option>
+  <option value="en">English</option>
+  <option value="pt">Português</option>
+  <option value="pl">Polski</option>
+</select>
 
 <div id="areasel" style="display:none">
   <div class="b-panel">
-    <div class="b-title">フライトエリア選択</div>
+    <div class="b-title" data-i18n="areasel.title">フライトエリア選択</div>
     <div class="a-presets" id="area-presets"></div>
     <canvas id="area-map" width="1280" height="960"></canvas>
-    <div class="mapnote">クリック: エリア中心を選択(橙枠 = 約20km四方の飛行エリア、中央がターゲット)/ ホイール: 拡大縮小 / ドラッグ: 移動</div>
-    <button id="area-btn" disabled>地図でエリアを選択してください</button>
+    <div class="mapnote" data-i18n="areasel.mapnote">クリック: エリア中心を選択(橙枠 = 約20km四方の飛行エリア、中央がターゲット)/ ホイール: 拡大縮小 / ドラッグ: 移動</div>
+    <button id="area-btn" disabled data-i18n="areasel.btnDefault">地図でエリアを選択してください</button>
   </div>
 </div>
 
 <div id="briefing" style="display:none">
   <div class="b-panel">
-    <div class="b-title">タスクブリーフィング</div>
+    <div class="b-title" data-i18n="briefing.title">タスクブリーフィング</div>
     <div class="b-cols">
       <div class="b-left">
         <table class="tasksheet">
-          <tr><th>競技</th><td>JDG(ジャッジ・ディクレアード・ゴール)</td></tr>
-          <tr><th>ターゲット</th><td>地図上の橙色X</td></tr>
-          <tr><th>離陸</th><td>個別離陸(地図をクリックして選択)</td></tr>
-          <tr><th>制限時間</th><td>30:00(ゲーム内時間)</td></tr>
-          <tr><th>マーカー</th><td>1本(Mキーで投下)</td></tr>
-          <tr><th>スコア</th><td>マーカー着地点〜ターゲット中心の距離</td></tr>
+          <tr><th data-i18n="task.disciplineLabel">競技</th><td data-i18n="task.disciplineValue">JDG(ジャッジ・ディクレアード・ゴール)</td></tr>
+          <tr><th data-i18n="task.targetLabel">ターゲット</th><td data-i18n="task.targetValue">地図上の橙色X</td></tr>
+          <tr><th data-i18n="task.launchLabel">離陸</th><td data-i18n="task.launchValue">個別離陸(地図をクリックして選択)</td></tr>
+          <tr><th data-i18n="task.timeLimitLabel">制限時間</th><td data-i18n="task.timeLimitValue">30:00(ゲーム内時間)</td></tr>
+          <tr><th data-i18n="task.markerLabel">マーカー</th><td data-i18n="task.markerValue">1本(Mキーで投下)</td></tr>
+          <tr><th data-i18n="task.scoreLabel">スコア</th><td data-i18n="task.scoreValue">マーカー着地点〜ターゲット中心の距離</td></tr>
         </table>
-        <div class="b-sub">パイバル観測データ(編集できます)</div>
+        <div class="b-sub" data-i18n="wind.sub">パイバル観測データ(編集できます)</div>
         <div class="wind-tools">
           <select id="wind-preset"></select>
-          <button id="wind-add" type="button">+行</button>
-          <button id="wind-copy" type="button">条件URLをコピー</button>
+          <button id="wind-add" type="button" data-i18n="wind.addBtn">+行</button>
+          <button id="wind-copy" type="button" data-i18n="wind.copyBtn">条件URLをコピー</button>
         </div>
         <table class="b-pibal">
-          <thead><tr><th>高度ft</th><th>風向°</th><th>風速kt</th><th></th></tr></thead>
+          <thead><tr><th data-i18n="wind.thAlt">高度ft</th><th data-i18n="wind.thDir">風向°</th><th data-i18n="wind.thSpeed">風速kt</th><th></th></tr></thead>
           <tbody id="wind-editor"></tbody>
         </table>
-        <div class="b-hint">
+        <div class="b-hint" data-i18n-html="briefing.hintHtml">
           風向はFROM(磁方位)。表は編集でき、プリセット選択・行の追加削除も可能です。<br>
           ターゲットの風上側に離陸地点を取り、高度で風を乗り換えて狙いましょう。<br>
           「条件URLをコピー」で、この風と同じ条件に挑戦できるURLを共有できます。
         </div>
-        <div class="b-sub">地上風のゆらぎ(β)</div>
+        <div class="b-sub" data-i18n="gw.sub">地上風のゆらぎ(β)</div>
         <div class="gw-box">
-          <label class="gw-toggle"><input type="checkbox" id="gw-enable"> 有効にする</label>
+          <label class="gw-toggle"><input type="checkbox" id="gw-enable"> <span data-i18n="gw.enableLabel">有効にする</span></label>
           <div class="gw-row" id="gw-dist-row" style="display:none">
-            高気圧までの距離 <input type="number" id="gw-dist" min="0" step="10" value="300"> km
+            <span data-i18n="gw.distLabel">高気圧までの距離</span> <input type="number" id="gw-dist" min="0" step="10" value="300"> <span data-i18n="gw.distUnit">km</span>
           </div>
-          <div class="gw-hint" id="gw-dist-hint" style="display:none">
+          <div class="gw-hint" id="gw-dist-hint" style="display:none" data-i18n-html="gw.hintHtml">
             地上付近の風は表の値通りとは限りません。実際の値は離陸時に1回だけ決まり、パイロットには分かりません。
             飛行中は<b>Gキー</b>で地上クルーに無線確認できます(速度はおおよその感触のみ)。
           </div>
         </div>
-        <button id="launch-btn" disabled>地図で離陸地点を選択してください</button>
+        <button id="launch-btn" disabled data-i18n="launch.btnDefault">地図で離陸地点を選択してください</button>
       </div>
       <div class="b-right">
         <canvas id="launch-map" width="1280" height="1280"></canvas>
-        <div class="mapnote">地理院タイル(標準地図)/ 北が上 / クリック: 離陸地点を選択 / ホイール: 拡大縮小 / ドラッグ: 移動</div>
+        <div class="mapnote" data-i18n="launch.mapnote">地理院タイル(標準地図)/ 北が上 / クリック: 離陸地点を選択 / ホイール: 拡大縮小 / ドラッグ: 移動</div>
       </div>
     </div>
     <div id="mp-box">
-      <div class="b-sub">🎈 みんなで飛ぶ(ベータ)</div>
+      <div class="b-sub" data-i18n="mp.title">🎈 みんなで飛ぶ(ベータ)</div>
       <div id="mp-entry">
         <div class="mp-row">
-          <input type="text" id="mp-name" maxlength="12" placeholder="パイロット名">
+          <input type="text" id="mp-name" maxlength="12" data-i18n-attr="placeholder:mp.namePlaceholder" placeholder="パイロット名">
         </div>
         <div id="mp-colors"></div>
         <div class="mp-row">
-          <button type="button" class="mp-btn primary" id="mp-create">ルームを作る</button>
+          <button type="button" class="mp-btn primary" id="mp-create" data-i18n="mp.createBtn">ルームを作る</button>
         </div>
         <div class="mp-join-row">
-          <div class="mp-join-hint">友達から届いたコードで参加する場合はこちら↓</div>
+          <div class="mp-join-hint" data-i18n="mp.joinHint">友達から届いたコードで参加する場合はこちら↓</div>
           <div class="mp-row">
-            <input type="text" id="mp-code-in" maxlength="6" placeholder="コード">
-            <button type="button" class="mp-btn" id="mp-join-btn">参加</button>
+            <input type="text" id="mp-code-in" maxlength="6" data-i18n-attr="placeholder:mp.codePlaceholder" placeholder="コード">
+            <button type="button" class="mp-btn" id="mp-join-btn" data-i18n="mp.joinBtn">参加</button>
           </div>
         </div>
       </div>
       <div id="mp-lobby" style="display:none">
-        <div class="mp-row"><span>ルーム: </span><b id="mp-room-code"></b>
-          <button type="button" class="mp-btn" id="mp-copy">招待URLをコピー</button>
+        <div class="mp-row"><span data-i18n="mp.roomLabel">ルーム: </span><b id="mp-room-code"></b>
+          <button type="button" class="mp-btn" id="mp-copy" data-i18n="mp.copyBtn">招待URLをコピー</button>
         </div>
         <div class="mp-row">
-          <button type="button" class="mp-btn" id="mp-copy-mobile">スマホの相手を招待するURLをコピー</button>
+          <button type="button" class="mp-btn" id="mp-copy-mobile" data-i18n="mp.copyOtherBtn">スマホの相手を招待するURLをコピー</button>
         </div>
         <div id="mp-roster"></div>
-        <button type="button" class="mp-btn primary" id="mp-start" style="display:none" disabled>全員の準備完了待ち</button>
+        <button type="button" class="mp-btn primary" id="mp-start" style="display:none" disabled data-i18n="mp.waitingReady">全員の準備完了待ち</button>
       </div>
       <div id="mp-status"></div>
     </div>
@@ -349,49 +360,49 @@
 </div>
 
 <div id="result" class="panel" style="display:none">
-  <button id="result-hide" type="button" title="結果を隠して周囲を見る">隠す ▾</button>
-  <div class="r-title">JDG リザルト</div>
+  <button id="result-hide" type="button" data-i18n="result.hideBtn" data-i18n-attr="title:result.hideTitle" title="結果を隠して周囲を見る">隠す ▾</button>
+  <div class="r-title" data-i18n="result.title">JDG リザルト</div>
   <div class="r-dist"><span id="result-dist">--</span> m</div>
   <div class="r-sub" id="result-sub"></div>
   <div class="r-launch" id="result-launch" style="display:none"></div>
   <div class="r-launch" id="result-gw" style="display:none"></div>
-  <button id="result-retry">もう一度飛ぶ</button>
-  <button id="result-share">条件URLをコピー</button>
-  <button id="result-replay" style="display:none">🎯 投下シーンをリプレイ</button>
+  <button id="result-retry" data-i18n="result.retryBtn">もう一度飛ぶ</button>
+  <button id="result-share" data-i18n="wind.copyBtn">条件URLをコピー</button>
+  <button id="result-replay" style="display:none" data-i18n="result.replayBtn">🎯 投下シーンをリプレイ</button>
   <div class="r-support">
-    <div class="s-title">🎈 日本代表を応援しよう!</div>
-    <div class="s-text">
+    <div class="s-title" data-i18n="support.title">🎈 日本代表を応援しよう!</div>
+    <div class="s-text" data-i18n="support.text1">
       2026年9月、ポーランド🇵🇱クロスノで開催される熱気球世界選手権に、
       日本から7名のパイロットが日本代表として出場予定です。
     </div>
     <a class="s-btn" href="https://docs.google.com/forms/d/e/1FAIpQLSdhAzGXCH2ZGikzn_RY3RanpaANnoMbtcZ9XlQYyfdCiSGKDA/viewform"
-       target="_blank" rel="noopener">応援Tシャツを申し込む</a>
-    <div class="s-text">
+       target="_blank" rel="noopener" data-i18n="support.tshirtBtn">応援Tシャツを申し込む</a>
+    <div class="s-text" data-i18n-html="support.text2">
       Tシャツは3デザイン×各2色、綿素材とドライ素材から選べます。<br>
       ご寄付も受け付けています。ご寄付いただいた方には、世界選手権の開催地
       クロスノの実在地形で飛べる<b>特別版アプリ</b>をお届けします。
     </div>
     <a class="s-btn insta" href="https://www.instagram.com/hotairballoongames2026/"
-       target="_blank" rel="noopener">寄付のご案内はInstagramへ</a>
+       target="_blank" rel="noopener" data-i18n="support.instaBtn">寄付のご案内はInstagramへ</a>
   </div>
 </div>
-<button id="result-reopen" type="button" style="display:none">結果を表示 ▴</button>
+<button id="result-reopen" type="button" style="display:none" data-i18n="result.reopenBtn">結果を表示 ▴</button>
 
 <div id="pibal" class="panel">
   <div class="pibal-head">
-    <b>パイバル観測データ</b>
+    <b data-i18n="pibal.panelTitle">パイバル観測データ</b>
     <button id="wind-mode-toggle" type="button">FROM</button>
   </div>
   <table>
-    <thead><tr><th>高度ft</th><th>風向°</th><th>風速kt</th></tr></thead>
+    <thead><tr><th data-i18n="wind.thAlt">高度ft</th><th data-i18n="wind.thDir">風向°</th><th data-i18n="wind.thSpeed">風速kt</th></tr></thead>
     <tbody id="pibal-body"></tbody>
   </table>
-  <div class="note">高度: MSL / 風向: <span id="pibal-mode-label">FROM</span>(磁方位)<br>※磁気偏角は未考慮(プロトタイプ)</div>
+  <div class="note" data-i18n-html="pibal.note">高度: MSL / 風向: <span id="pibal-mode-label">FROM</span>(磁方位)<br>※磁気偏角は未考慮(プロトタイプ)</div>
 </div>
 
 <canvas id="compass" width="150" height="150"></canvas>
 
-<div id="help" class="panel">
+<div id="help" class="panel" data-i18n-html="help.bodyHtml">
   <b>Space</b> バーナー(長押し) <b>R</b> リップライン(長押し) <b>M</b> マーカー投下<br>
   <b>V</b> 視点切替(ゴンドラ/外部) <b>1-4</b> 時間加速 ×1/×2/×4/×8<br>
   <b>P</b> パイバル表 表示/非表示 <b>G</b> 地上クルーに無線確認(ゆらぎ有効時)<br>
@@ -400,43 +411,43 @@
 
 <div id="gw-report" class="panel"></div>
 
-<div id="credit" class="panel">
+<div id="credit" class="panel" data-i18n-html="credit.html">
   出典: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院 地理院タイル</a>(標高タイル・全国最新写真)
 </div>
 
 <div id="mp-join">
   <div class="b-panel">
-    <div class="b-title">ルームに参加</div>
-    <div style="font-size:13px">ルーム <b id="mp-join-code"></b> に参加します。名前と気球の色を選んでください。</div>
+    <div class="b-title" data-i18n="mpJoin.title">ルームに参加</div>
+    <div style="font-size:13px" data-i18n-html="mpJoin.descHtml">ルーム <b id="mp-join-code"></b> に参加します。名前と気球の色を選んでください。</div>
     <div class="mp-row" style="margin-top:10px">
-      <input type="text" id="mp-join-name" maxlength="12" placeholder="パイロット名">
+      <input type="text" id="mp-join-name" maxlength="12" data-i18n-attr="placeholder:mp.namePlaceholder" placeholder="パイロット名">
     </div>
     <div id="mp-join-colors"></div>
-    <button type="button" class="mp-btn primary" id="mp-join-go" style="margin-top:8px">参加する</button>
+    <button type="button" class="mp-btn primary" id="mp-join-go" style="margin-top:8px" data-i18n="mpJoin.goBtn">参加する</button>
     <div id="mp-join-status" style="margin-top:8px;font-size:12px;color:#ffd54f"></div>
   </div>
 </div>
 
 <div id="mp-countdown">
-  <div>同時離陸まで</div>
+  <div data-i18n="mpCountdown.label">同時離陸まで</div>
   <div class="num" id="mp-countdown-num">5</div>
 </div>
 
 <div id="mp-board" class="panel"></div>
 
 <div id="mp-results" class="panel">
-  <div class="r-title">🏁 リザルト(全員確定)</div>
+  <div class="r-title" data-i18n="mpResults.title">🏁 リザルト(全員確定)</div>
   <table>
-    <thead><tr><th>#</th><th>パイロット</th><th style="text-align:right">距離</th></tr></thead>
+    <thead><tr><th data-i18n="mpResults.thRank">#</th><th data-i18n="mpResults.thPilot">パイロット</th><th style="text-align:right" data-i18n="mpResults.thDist">距離</th></tr></thead>
     <tbody id="mp-results-body"></tbody>
   </table>
-  <button id="mp-rematch" style="display:none;margin-top:12px" class="mp-btn primary">もう一回戦</button>
+  <button id="mp-rematch" style="display:none;margin-top:12px" class="mp-btn primary" data-i18n="mpResults.rematchBtn">もう一回戦</button>
   <div id="mp-results-gw" style="margin-top:8px;font-size:11px;color:#8a99a8"></div>
   <div id="mp-results-note" style="margin-top:10px;font-size:12px;color:#9ab"></div>
 </div>
 
 <div id="loading" style="display:none">
-  <div class="t" id="load-title">地形を読み込み中…</div>
+  <div class="t" id="load-title" data-i18n="loading.generic">地形を読み込み中…</div>
   <div class="p" id="load-progress">0 / 0</div>
 </div>
 

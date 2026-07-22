@@ -576,7 +576,9 @@ function toggleCredit() {
   c.style.display = hidden ? 'block' : 'none';
 }
 document.getElementById('credit-toggle').addEventListener('click', toggleCredit);
-document.getElementById('lang-toggle').addEventListener('click', () => setLang(LANG === 'ja' ? 'en' : 'ja'));
+const langSelect = document.getElementById('lang-select');
+langSelect.value = LANG;
+langSelect.addEventListener('change', () => setLang(langSelect.value));
 
 function setTimeScale(v) {
   // マルチプレイでは「希望」をサーバーへ送るだけ。実際の反映は合意値(scale配信)を待つ
@@ -1207,7 +1209,7 @@ function startFlight(x, z) {
   }
   document.getElementById('touch-tools').style.display = 'flex';
   document.getElementById('btn-groundcrew').style.display = groundWind ? '' : 'none';
-  document.getElementById('lang-toggle').style.display = 'none';
+  document.getElementById('lang-select').style.display = 'none';
   flightReady = true;
   started = true;
 }
