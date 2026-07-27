@@ -35,9 +35,9 @@ let AREA = null;       // { lon, lat, name? } エリア選択またはURLで決�
 const PRESET_AREAS = [
   { name: t('area.saga'), lon: 130.25, lat: 33.27 },
   { name: t('area.watarase'), lon: 139.68, lat: 36.22 },
-  { name: t('area.saku'), lon: 138.48, lat: 36.25 },
+  { name: t('area.saku'), lon: 138.432328, lat: 36.248912 }, // 千曲川スポーツ交流広場
   { name: t('area.ichinoseki'), lon: 141.13, lat: 38.93 },
-  { name: t('area.kamishihoro'), lon: 143.30, lat: 43.23 },
+  { name: t('area.kamishihoro'), lon: 143.27715, lat: 43.242474 }, // 上士幌航空公園
 ];
 
 // URLの ?a=lon,lat からエリアを復元
