@@ -37,7 +37,7 @@ const PRESET_AREAS = [
   { name: t('area.watarase'), lon: 139.68, lat: 36.22 },
   { name: t('area.saku'), lon: 138.432328, lat: 36.248912 }, // 千曲川スポーツ交流広場
   { name: t('area.ichinoseki'), lon: 141.13, lat: 38.93 },
-  { name: t('area.kamishihoro'), lon: 143.27715, lat: 43.242474 }, // 上士幌航空公園
+  { name: t('area.kamishihoro'), lon: 143.277865, lat: 43.237889 }, // 上士幌航空公園
 ];
 
 // URLの ?a=lon,lat からエリアを復元
