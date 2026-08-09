@@ -886,6 +886,12 @@ function setupAreaMap(onSelect) {
 }
 
 // ---- メイン ----
+// 気球の色・柄選択ボタンの配線は、下のゲスト入室ゲート(top-level await)より前に
+// 済ませておく必要がある。ゲートはユーザーが「参加する」を押すまでブロックし、
+// その間に「気球の色を選ぶ」ボタンが押される可能性があるため
+// (配線がまだなら押しても無反応になり、接続時に古い/既定の柄のまま送られてしまう)
+initBalloonModalUI();
+
 // ?room= 付きで開いた場合はゲスト入室: 接続してホストの条件(エリア・風)を受け取る
 const MP_JOIN_CODE = (new URLSearchParams(location.search).get('room') || '').toUpperCase();
 if (MP_JOIN_CODE) {
@@ -1172,7 +1178,6 @@ if (!MP.room || MP.resumeState === 'lobby') {
   document.getElementById('briefing').style.display = '';
 }
 mpBriefingInit();
-initBalloonModalUI();
 
 // ブリーフィング地図: ズーム(ホイール)+パン(ドラッグ)可能な簡易スリッピーマップ。
 // ズームに応じて標準地図タイルを z11〜z17 から選んで表示する
