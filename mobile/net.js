@@ -58,8 +58,9 @@ export class Room {
   on(type, fn) { this.handlers.set(type, fn); return this; }
   emit(type, data) { const fn = this.handlers.get(type); if (fn) fn(data); }
 
-  connect({ code, name, color, create }) {
-    const url = `${serverUrl()}/ws/${code}?name=${encodeURIComponent(name)}&color=${color}&create=${create ? 1 : 0}`;
+  connect({ code, name, color, appearance, create }) {
+    const url = `${serverUrl()}/ws/${code}?name=${encodeURIComponent(name)}&color=${color}`
+      + `&appearance=${encodeURIComponent(appearance || '')}&create=${create ? 1 : 0}`;
     return new Promise((resolve, reject) => {
       let settled = false;
       const ws = new WebSocket(url);

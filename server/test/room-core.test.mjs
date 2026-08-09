@@ -29,6 +29,17 @@ test('未作成ルームへの参加は拒否、create=1で作成', () => {
   assert.equal(hello.to, r.id);
 });
 
+test('appearance(気球の柄+配色コード)はjoin時に検証・保存され、rosterで中継される', () => {
+  const room = new RoomCore();
+  const a = room.join('Alice', 2, true, 0, '1A2B3C');
+  const b = room.join('Bob', 5, false, 0, 'not-hex!!');
+  const c = room.join('Carol', 1, false, 0);
+  const roster = room.roster();
+  assert.equal(roster.find((p) => p.id === a.id).appearance, '1A2B3C');
+  assert.equal(roster.find((p) => p.id === b.id).appearance, null, '不正な文字列はnullにフォールバック');
+  assert.equal(roster.find((p) => p.id === c.id).appearance, null, '省略時もnull');
+});
+
 test('満員・重複入室制御', () => {
   const room = new RoomCore({ maxPlayers: 2 });
   room.join('A', 0, true, 0);

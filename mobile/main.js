@@ -6,12 +6,39 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { buildTerrain, lonLatToTile } from './terrain.js';
 import { LANG, t, setLang, applyStaticI18n } from './i18n.js';
 import { Room, randomRoomCode, BALLOON_COLORS } from './net.js';
+import {
+  GORES, MAX_COLORS, DEFAULT_APPEARANCE, PATTERN_IDS, PATTERNS, TAPE_COLORS,
+  encodeAppearance, decodeAppearance, colorSlotAt,
+} from './balloon-appearance.js';
 
 applyStaticI18n();
 
+// 気球の色・柄(ソロ・マルチプレイ共通の選択状態)。localStorageに16進コードで永続化する。
+// prototype/mobileは同一オリジンの別パスなのでキーを共有し、どちらで選んでも引き継がれる
+const BALLOON_APPEARANCE_KEY = 'balloon-appearance';
+function loadStoredAppearance() {
+  try {
+    const raw = localStorage.getItem(BALLOON_APPEARANCE_KEY);
+    return raw ? decodeAppearance(raw) : { ...DEFAULT_APPEARANCE };
+  } catch { return { ...DEFAULT_APPEARANCE }; }
+}
+let myAppearance = loadStoredAppearance();
+function setMyAppearance(appearance) {
+  myAppearance = appearance;
+  try { localStorage.setItem(BALLOON_APPEARANCE_KEY, encodeAppearance(appearance)); } catch { /* 保存不可でも続行 */ }
+  renderBalloonAppearanceButton();
+}
+// 気球色選択モーダルの状態。ゲスト入室ゲート(mpJoinGate)がトップレベルの
+// awaitでブロックしている間にモーダルのボタンが押される可能性があるため、
+// これらのletはその手前(このファイルの先頭付近)で宣言しておく必要がある
+// (そうしないとTDZ違反 "Cannot access ... before initialization" になる)
+let balloonDraft = null; // モーダルを開いている間だけの編集中コピー(閉じる=破棄)
+let previewScene = null, previewCamera = null, previewRenderer = null, previewBalloon = null;
+let previewRAF = null;
+
 // マルチプレイ状態(ソロプレイでは MP.room が null のまま)。実装はファイル末尾の「マルチプレイ」節
 const MP = {
-  room: null, code: null, myName: '', myColor: 0,
+  room: null, code: null, myName: '',
   desired: 1,          // 自分が希望する時間加速(全体への反映はサーバーの合意値)
   ready: false, launch: null,
   resultsShown: false, // 全員確定の順位表を表示済みか
@@ -217,7 +244,6 @@ function buildWickerTexture() {
   return tex;
 }
 
-// ゴア(縦の縫い目パネル)模様のテクスチャ。bright=true は内面用の明るい配色
 // 色を白方向に混ぜて明るくする(内面=日光が透けた布の表現用)
 function lighten(hex, k) {
   const n = parseInt(hex.slice(1), 16);
@@ -225,25 +251,84 @@ function lighten(hex, k) {
   return `rgb(${ch((n >> 16) & 255)},${ch((n >> 8) & 255)},${ch(n & 255)})`;
 }
 
-// pal={cols:[濃,淡], seam} を渡すと球皮カラーを差し替えられる(マルチプレイの色選択)
-function buildGoreTexture(bright, pal) {
+// ゴア(縦の縫い目パネル)模様のテクスチャ。bright=true は内面用の明るい配色。
+// appearance={pattern, colors:[BALLOON_COLORSの番号...], soloFill} で球皮の柄・配色を
+// 差し替えられる(気球の色選択UI・マルチプレイでの共有)。省略時は既定(赤の濃淡2トーン)
+function buildGoreTexture(bright, appearance) {
   const cv = document.createElement('canvas');
   cv.width = 512;
   cv.height = 64;
   const ctx = cv.getContext('2d');
-  const gores = 16, w = 512 / gores;
-  const base = pal || { cols: ['#c62828', '#a81f1f'], seam: '#7a1515' };
-  const cols = bright ? base.cols.map((c) => lighten(c, 0.25)) : base.cols;
-  const seam = bright ? lighten(base.seam, 0.3) : base.seam;
-  for (let i = 0; i < gores; i++) {
-    ctx.fillStyle = cols[i % 2];
-    ctx.fillRect(i * w, 0, w, 64);
-    ctx.fillStyle = seam;
-    ctx.fillRect(i * w, 0, 2, 64);
+  const w = 512 / GORES;
+  const app = appearance || DEFAULT_APPEARANCE;
+  const colorIdxs = app.colors && app.colors.length ? app.colors : [0];
+  const palettes = colorIdxs.map((i) => BALLOON_COLORS[i] || BALLOON_COLORS[0]);
+
+  // ロードテープ(ゴアとゴアをつなぐ縦の継ぎ目テープ)の色。tape==='transparent'
+  // のときは継ぎ目自体を描かない(パネルが途切れ目無く見える)
+  const tape = app.tape || 'brown';
+  const tapeHex = tape === 'white' ? '#eceff1' : '#5c3a26';
+  const seam = bright ? lighten(tapeHex, 0.3) : tapeHex;
+
+  if (palettes.length === 1) {
+    // 単色: 現行実装通り、濃淡2トーンの交互塗り(soloFill指定時はベタ塗り)
+    const base = palettes[0];
+    const cols = bright ? base.cols.map((c) => lighten(c, 0.25)) : base.cols;
+    for (let i = 0; i < GORES; i++) {
+      ctx.fillStyle = app.soloFill ? cols[0] : cols[i % 2];
+      ctx.fillRect(i * w, 0, w, 64);
+      if (tape !== 'transparent') {
+        ctx.fillStyle = seam;
+        ctx.fillRect(i * w, 0, 2, 64);
+      }
+    }
+  } else {
+    // 複数色: パターンに従ってゴア×高さを塗り分ける(各色は代表色uiを使用)
+    const filled = palettes.map((p) => (bright ? lighten(p.ui, 0.25) : p.ui));
+    const rows = 64;
+    // サファイアのように、実際の球皮パネル数(GORES)とは別に柄自体の見た目の
+    // 分割を細かくしたいパターンは fineSlices ヒントに従う。さらに alignSeams
+    // 指定があれば継ぎ目テープもその分割に合わせて引く(市松は1マス=1ゴアなので、
+    // 継ぎ目が16本のままだとマスの途中を横切って柄が崩れてしまう)
+    const patDef = PATTERNS[app.pattern];
+    const slices = (patDef && patDef.fineSlices) || GORES;
+    const fine = slices !== GORES;
+    const sw = 512 / slices;
+    for (let k = 0; k < slices; k++) {
+      const gv = fine ? (k + 0.5) * GORES / slices : k;
+      const x0 = Math.round(k * sw);
+      const x1 = Math.round((k + 1) * sw);
+      for (let y = 0; y < rows; y++) {
+        const v = (y + 0.5) / rows;
+        ctx.fillStyle = filled[colorSlotAt(app, gv, v)];
+        ctx.fillRect(x0, y, x1 - x0, 1);
+      }
+    }
+    if (tape !== 'transparent') {
+      const seams = patDef && patDef.alignSeams ? slices : GORES;
+      const seamW = 512 / seams;
+      for (let i = 0; i < seams; i++) {
+        ctx.fillStyle = seam;
+        ctx.fillRect(Math.round(i * seamW), 0, 2, 64);
+      }
+    }
   }
   const tex = new THREE.CanvasTexture(cv);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
+}
+
+// スカート(球皮の開口部を覆う円筒)の色。既定は1色目の濃いトーンで球皮の裾と
+// 馴染ませるが、サファイアのように実機が開口部を球皮の最上段と同じ濃色に
+// している柄では、最後の色(=最上段の色)を使う
+function skirtColorFor(appearance) {
+  const app = appearance || DEFAULT_APPEARANCE;
+  const cols = app.colors && app.colors.length ? app.colors : [0];
+  const patDef = PATTERNS[app.pattern];
+  const useTop = !!(patDef && patDef.skirtUsesTopColor) && cols.length > 1;
+  const pal = BALLOON_COLORS[useTop ? cols[cols.length - 1] : cols[0]] || BALLOON_COLORS[0];
+  // 複数色の球皮は代表色uiで塗られているので、最上段に合わせるときもuiを使う
+  return useTop ? pal.ui : pal.cols[1];
 }
 
 // ---- 気球(プレースホルダ形状) ----
@@ -997,6 +1082,184 @@ function copyShare(btn) {
 }
 document.getElementById('result-share').addEventListener('click', (e) => copyShare(e.target));
 
+// ---- 気球の色・柄選択(ソロ・マルチプレイ共通のモーダル) ----
+// 選択結果は balloon-appearance.js の {pattern, colors:[BALLOON_COLORSの番号...], soloFill}。
+// 16進数コードでlocalStorage永続化・再入力・マルチプレイでの共有ができる
+
+function balloonBtnHtml() {
+  const primary = BALLOON_COLORS[myAppearance.colors[0]] || BALLOON_COLORS[0];
+  return `<span class="balloon-btn-dot" style="background:${primary.ui}"></span>${esc(t('balloon.chooseBtn'))}`;
+}
+
+// ソロ・MP作成・MP参加、3箇所の「気球の色を選ぶ」ボタンを最新の選択で更新する
+function renderBalloonAppearanceButton() {
+  for (const id of ['balloon-open-btn', 'balloon-open-btn-mp', 'balloon-open-btn-mpjoin']) {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = balloonBtnHtml();
+  }
+}
+
+function openBalloonModal() {
+  balloonDraft = {
+    pattern: myAppearance.pattern, colors: [...myAppearance.colors],
+    soloFill: myAppearance.soloFill, tape: myAppearance.tape,
+  };
+  document.getElementById('balloon-code-msg').textContent = '';
+  startPreviewAnim(); // renderBalloonModal()がプレビューへ適用する前にpreviewBalloonを用意しておく
+  renderBalloonModal();
+  document.getElementById('balloon-modal').style.display = 'flex';
+}
+function closeBalloonModal() {
+  document.getElementById('balloon-modal').style.display = 'none';
+  stopPreviewAnim();
+}
+
+function renderBalloonModal() {
+  const patRow = document.getElementById('balloon-pattern-row');
+  patRow.innerHTML = PATTERN_IDS.map((id) =>
+    `<button type="button" class="mp-btn${id === balloonDraft.pattern ? ' primary' : ''}" data-pattern="${id}">${esc(t(`balloon.pattern.${id}`))}</button>`)
+    .join('');
+  [...patRow.children].forEach((b) => b.addEventListener('click', () => {
+    balloonDraft.pattern = b.dataset.pattern;
+    renderBalloonModal();
+  }));
+
+  const countRow = document.getElementById('balloon-count-row');
+  const n = balloonDraft.colors.length;
+  countRow.innerHTML = Array.from({ length: MAX_COLORS }, (_, i) => i + 1)
+    .map((c) => `<button type="button" class="mp-btn${c === n ? ' primary' : ''}" data-count="${c}">${c}</button>`).join('');
+  [...countRow.children].forEach((b) => b.addEventListener('click', () => {
+    const c = Number(b.dataset.count);
+    const cur = balloonDraft.colors;
+    if (c > cur.length) {
+      const used = new Set(cur);
+      while (cur.length < c) {
+        const free = BALLOON_COLORS.findIndex((_, i) => !used.has(i));
+        const idx = free >= 0 ? free : cur.length % BALLOON_COLORS.length;
+        cur.push(idx);
+        used.add(idx);
+      }
+    } else {
+      cur.length = c;
+    }
+    renderBalloonModal();
+  }));
+
+  const fillRow = document.getElementById('balloon-solofill-row');
+  if (n === 1) {
+    fillRow.style.display = '';
+    fillRow.innerHTML = [
+      { v: false, key: 'balloon.fillShaded' },
+      { v: true, key: 'balloon.fillFlat' },
+    ].map((o) => `<button type="button" class="mp-btn${balloonDraft.soloFill === o.v ? ' primary' : ''}" data-fill="${o.v}">${esc(t(o.key))}</button>`).join('');
+    [...fillRow.children].forEach((b) => b.addEventListener('click', () => {
+      balloonDraft.soloFill = b.dataset.fill === 'true';
+      renderBalloonModal();
+    }));
+  } else {
+    fillRow.style.display = 'none';
+    fillRow.innerHTML = '';
+  }
+
+  const slots = document.getElementById('balloon-slots');
+  slots.innerHTML = balloonDraft.colors.map((sel, i) =>
+    `<div class="balloon-slot"><div class="b-hint">${esc(t('balloon.colorLabel', { n: i + 1 }))}</div>` +
+    `<div class="balloon-swatches" data-slot="${i}">` +
+    BALLOON_COLORS.map((c, ci) =>
+      `<button type="button" data-i="${ci}" title="${esc(c.name)}" style="background:${c.ui}" class="${ci === sel ? 'sel' : ''}"></button>`).join('') +
+    `</div></div>`).join('');
+  slots.querySelectorAll('.balloon-swatches').forEach((row) => {
+    const slotIdx = Number(row.dataset.slot);
+    row.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-i]');
+      if (!b) return;
+      balloonDraft.colors[slotIdx] = Number(b.dataset.i);
+      renderBalloonModal();
+    });
+  });
+
+  const tapeRow = document.getElementById('balloon-tape-row');
+  tapeRow.innerHTML = TAPE_COLORS.map((tc) =>
+    `<button type="button" class="mp-btn${tc === balloonDraft.tape ? ' primary' : ''}" data-tape="${tc}">${esc(t(`balloon.tape.${tc}`))}</button>`)
+    .join('');
+  [...tapeRow.children].forEach((b) => b.addEventListener('click', () => {
+    balloonDraft.tape = b.dataset.tape;
+    renderBalloonModal();
+  }));
+
+  document.getElementById('balloon-code-in').value = encodeAppearance(balloonDraft);
+  applyAppearanceToBalloon(previewBalloon, balloonDraft);
+}
+
+// ---- 色選択モーダルの3Dプレビュー(実機と同じbuildBalloon()を再利用し、
+// ゆっくり回転させて全周から見た目を確認できるようにする。専用の
+// Scene/Camera/Rendererを持ち、メインの飛行シーンとは独立して動く) ----
+
+function initPreviewScene() {
+  if (previewRenderer) return;
+  const canvas = document.getElementById('balloon-modal-preview');
+  previewRenderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  previewRenderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  previewRenderer.setSize(168, 210, false);
+  previewScene = new THREE.Scene();
+  previewScene.background = new THREE.Color(0x9ec8e8);
+  previewScene.add(new THREE.HemisphereLight(0xcfe6ff, 0x54604a, 1.0));
+  const sun = new THREE.DirectionalLight(0xfff2df, 1.3);
+  sun.position.set(10, 20, 10);
+  previewScene.add(sun);
+  previewCamera = new THREE.PerspectiveCamera(32, 168 / 210, 1, 200);
+  previewCamera.position.set(0, 13, 50);
+  previewCamera.lookAt(0, 13, 0);
+  previewBalloon = buildBalloon();
+  previewScene.add(previewBalloon.group);
+}
+
+// 気球の向きをゆっくり回転させながら描画し続ける(モーダルを開いている間だけ)
+function animatePreview() {
+  previewBalloon.group.rotation.y += 0.003;
+  previewRenderer.render(previewScene, previewCamera);
+  previewRAF = requestAnimationFrame(animatePreview);
+}
+function startPreviewAnim() {
+  initPreviewScene();
+  if (previewRAF == null) animatePreview();
+}
+function stopPreviewAnim() {
+  if (previewRAF != null) { cancelAnimationFrame(previewRAF); previewRAF = null; }
+}
+
+function initBalloonModalUI() {
+  renderBalloonAppearanceButton();
+  for (const id of ['balloon-open-btn', 'balloon-open-btn-mp', 'balloon-open-btn-mpjoin']) {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('click', openBalloonModal);
+  }
+  document.getElementById('balloon-cancel-btn').addEventListener('click', closeBalloonModal);
+  document.getElementById('balloon-apply-btn').addEventListener('click', () => {
+    setMyAppearance({
+      pattern: balloonDraft.pattern, colors: [...balloonDraft.colors],
+      soloFill: balloonDraft.soloFill, tape: balloonDraft.tape,
+    });
+    closeBalloonModal();
+  });
+  document.getElementById('balloon-code-apply').addEventListener('click', () => {
+    const raw = document.getElementById('balloon-code-in').value.trim();
+    if (!/^[0-9a-fA-F]{1,6}$/.test(raw)) {
+      document.getElementById('balloon-code-msg').textContent = t('balloon.codeInvalid');
+      return;
+    }
+    balloonDraft = decodeAppearance(raw);
+    document.getElementById('balloon-code-msg').textContent = '';
+    renderBalloonModal();
+  });
+  document.getElementById('balloon-code-copy').addEventListener('click', (e) => {
+    navigator.clipboard.writeText(document.getElementById('balloon-code-in').value)
+      .then(() => { e.target.textContent = t('copy.success'); })
+      .catch(() => { e.target.textContent = t('copy.fail'); })
+      .finally(() => setTimeout(() => { e.target.textContent = t('balloon.codeCopyBtn'); }, 1600));
+  });
+}
+
 const launchSel = { x: null, z: null };
 setupLaunchMap();
 // 飛行中/リザルト中への復帰(フルリロード後)はソロと同じブリーフィング(離陸地点の
@@ -1005,6 +1268,7 @@ if (!MP.room || MP.resumeState === 'lobby') {
   document.getElementById('briefing').style.display = '';
 }
 mpBriefingInit();
+initBalloonModalUI();
 
 // ブリーフィング地図: ズーム(ホイール)+パン(ドラッグ)可能な簡易スリッピーマップ。
 // ズームに応じて標準地図タイルを z11〜z17 から選んで表示する
@@ -1189,6 +1453,7 @@ document.getElementById('launch-btn').addEventListener('click', () => {
 });
 
 function startFlight(x, z) {
+  if (!MP.room) applyBalloonAppearance(myAppearance); // ソロは自分で選んだ色・柄の気球に乗る
   applyTargetColor(!!groundWind);
   // 離陸地点とターゲット周辺は先に高解像度化しておく
   terrain.requestDetail(x, z);
@@ -1712,36 +1977,24 @@ function mpLaunchLabel(d) {
   return MP.room ? t('mp.readyBtn', { km }) : t('launch.btnSelected', { km });
 }
 
-// 色パレットを描画し、タップで選択(初期値はランダム)
-function mpRenderColors(containerId, initial) {
-  const el = document.getElementById(containerId);
-  el.innerHTML = BALLOON_COLORS
-    .map((c, i) => `<button type="button" data-i="${i}" title="${c.name}" style="background:${c.ui}"></button>`)
-    .join('');
-  const select = (i) => {
-    MP.myColor = i;
-    [...el.children].forEach((b, j) => b.classList.toggle('sel', j === i));
-  };
-  el.addEventListener('click', (e) => {
-    const b = e.target.closest('button[data-i]');
-    if (b) select(Number(b.dataset.i));
-  });
-  select(Number.isInteger(initial) ? initial : Math.floor(Math.random() * BALLOON_COLORS.length));
+// マルチプレイのロビーチップ・結果表など、旧来の単色インデックス表示用
+// (球皮パターン自体はmyAppearance.colorsの先頭色を代表色として使う)
+function primaryColorIndex() {
+  return (myAppearance.colors && myAppearance.colors[0]) || 0;
 }
 
 // ゲスト入室ゲート(?room= 付きで開いたとき、地形読み込みより先に呼ばれる)。
-// 名前と色を決めて接続し、ホストの条件(エリア・風)を返す
+// 名前と気球の色・柄を決めて接続し、ホストの条件(エリア・風)を返す
 async function mpJoinGate(code) {
   MP.code = code;
   const params = new URLSearchParams(location.search);
   const autoName = (params.get('n') || '').trim().slice(0, 12);
-  const cParam = Number(params.get('c'));
-  const initColor = Number.isInteger(cParam) && cParam >= 0 && cParam < BALLOON_COLORS.length
-    ? cParam : undefined;
+  const acParam = params.get('ac'); // 気球の色・柄コード(招待URL・再戦の自動再入室で引き継ぐ)
+  if (acParam) setMyAppearance(decodeAppearance(acParam));
 
   const overlay = document.getElementById('mp-join');
   document.getElementById('mp-join-code').textContent = code;
-  mpRenderColors('mp-join-colors', initColor);
+  renderBalloonAppearanceButton();
   const nameIn = document.getElementById('mp-join-name');
   nameIn.value = autoName;
   const statusEl = document.getElementById('mp-join-status');
@@ -1755,7 +2008,7 @@ async function mpJoinGate(code) {
     statusEl.textContent = t('mp.connecting');
     const room = new Room();
     try {
-      await room.connect({ code, name, color: MP.myColor, create: false });
+      await room.connect({ code, name, color: primaryColorIndex(), appearance: encodeAppearance(myAppearance), create: false });
       MP.room = room;
       MP.myName = name;
       return room;
@@ -1783,15 +2036,15 @@ async function mpJoinGate(code) {
     await waitClickAndConnect();
   };
 
-  if (autoName) room = await tryConnect(); // 再戦後の自動再入室(URLに名前と色を引き継いでいる)
+  if (autoName) room = await tryConnect(); // 再戦後の自動再入室(URLに名前と色柄を引き継いでいる)
   await waitClickAndConnect();
 
-  // 手入力で初参加した場合もURLに名前・色を反映しておく(事故リロード対策。
+  // 手入力で初参加した場合もURLに名前・色柄を反映しておく(事故リロード対策。
   // 再戦時の自動再入室と同じ仕組みに乗せる)
   if (!autoName) {
     const mpUrl = new URL(location.href);
     mpUrl.searchParams.set('n', MP.myName);
-    mpUrl.searchParams.set('c', String(MP.myColor));
+    mpUrl.searchParams.set('ac', encodeAppearance(myAppearance));
     history.replaceState(null, '', mpUrl);
   }
 
@@ -1842,14 +2095,14 @@ function mpBriefingInit() {
     mpRenderGroundWindUI();
     mpRenderRoster();
   } else {
-    mpRenderColors('mp-colors');
+    renderBalloonAppearanceButton();
     document.getElementById('mp-create').addEventListener('click', mpCreateRoom);
     document.getElementById('mp-join-btn').addEventListener('click', () => {
       const code = document.getElementById('mp-code-in').value.trim().toUpperCase();
       const name = document.getElementById('mp-name').value.trim().slice(0, 12);
       if (!/^[A-Z0-9]{4,8}$/.test(code)) { mpStatus(t('mp.enterCode')); return; }
       if (!name) { mpStatus(t('mp.enterName')); return; }
-      location.href = `${mpInviteUrl(code)}&n=${encodeURIComponent(name)}&c=${MP.myColor}`;
+      location.href = `${mpInviteUrl(code)}&n=${encodeURIComponent(name)}&ac=${encodeAppearance(myAppearance)}`;
     });
   }
   document.getElementById('mp-copy').addEventListener('click', (e) => {
@@ -1886,7 +2139,7 @@ async function mpCreateRoom() {
   const code = randomRoomCode();
   const room = new Room();
   try {
-    await room.connect({ code, name, color: MP.myColor, create: true });
+    await room.connect({ code, name, color: primaryColorIndex(), appearance: encodeAppearance(myAppearance), create: true });
   } catch (err) {
     mpStatus(t('mp.connectFailed', { err: err.message }));
     return;
@@ -1902,7 +2155,7 @@ async function mpCreateRoom() {
   const mpUrl = new URL(location.href);
   mpUrl.searchParams.set('room', code);
   mpUrl.searchParams.set('n', name);
-  mpUrl.searchParams.set('c', String(MP.myColor));
+  mpUrl.searchParams.set('ac', encodeAppearance(myAppearance));
   history.replaceState(null, '', mpUrl);
   applyWindFromEditor(); // エディタの内容で風を確定してから配布(以後は編集不可)
   let gwPayload = null;
@@ -1988,7 +2241,7 @@ function mpWireRoom() {
   });
   room.on('rematch', () => {
     // もう一回戦: 同じルームコードで同名・同色のまま再入室(条件はサーバーが保持)
-    location.href = `${mpInviteUrl(MP.code)}&n=${encodeURIComponent(MP.myName)}&c=${MP.myColor}`;
+    location.href = `${mpInviteUrl(MP.code)}&n=${encodeURIComponent(MP.myName)}&ac=${encodeAppearance(myAppearance)}`;
   });
   room.on('error', (m) => mpStatus(`⚠ ${m.msg || m.code}`));
   room.on('close', () => {
@@ -2035,7 +2288,7 @@ async function mpTryReconnect(attempt = 0) {
   try {
     // 作成者はcreate=1で再入室(全員切断でルームが空になっていても作り直せる)。
     // 飛行中・リザルト中は同名プレイヤーとしてサーバーが同じ機体に復帰させる
-    await room.connect({ code: MP.code, name: MP.myName, color: MP.myColor, create: MP.isCreator });
+    await room.connect({ code: MP.code, name: MP.myName, color: primaryColorIndex(), appearance: encodeAppearance(myAppearance), create: MP.isCreator });
     MP.room = room;
     mpWireRoom();
     if (!started && !MP.resultsShown) {
@@ -2123,22 +2376,25 @@ function mpRenderBoard() {
       .join('');
 }
 
-// 選んだ球皮カラーを自機に反映する(球皮の外面・内面・スカート)
-function applyBalloonColor(idx) {
-  const c = BALLOON_COLORS[idx];
-  if (!c) return;
-  const pal = { cols: c.cols, seam: c.seam };
-  balloon.envMat.map = buildGoreTexture(false, pal);
-  balloon.envMat.needsUpdate = true;
-  balloon.envInnerMat.map = buildGoreTexture(true, pal);
-  balloon.envInnerMat.needsUpdate = true;
-  balloon.skirtMat.color.set(c.cols[1]);
+// 選んだ球皮の色・柄をbuildBalloon()が返した気球インスタンスに反映する
+// (球皮の外面・内面・継ぎ目のロードテープ・スカート)。自機・色選択モーダルの
+// 3Dプレビュー、どちらも同じ関数を使うことで見た目を完全に一致させる
+function applyAppearanceToBalloon(target, appearance) {
+  const app = appearance || DEFAULT_APPEARANCE;
+  if (target.envMat.map) target.envMat.map.dispose();
+  target.envMat.map = buildGoreTexture(false, app);
+  target.envMat.needsUpdate = true;
+  if (target.envInnerMat.map) target.envInnerMat.map.dispose();
+  target.envInnerMat.map = buildGoreTexture(true, app);
+  target.envInnerMat.needsUpdate = true;
+  target.skirtMat.color.set(skirtColorFor(app));
 }
+function applyBalloonAppearance(appearance) { applyAppearanceToBalloon(balloon, appearance); }
 
 // 同時離陸カウントダウン(サーバーからの相対時間inMsを使い、時計ずれの影響を受けない)
 function mpCountdown(m) {
   document.getElementById('briefing').style.display = 'none';
-  applyBalloonColor(MP.myColor); // 自分の視点でも選んだ色の気球に乗る
+  applyBalloonAppearance(myAppearance); // 自分の視点でも選んだ色・柄の気球に乗る
   const ov = document.getElementById('mp-countdown');
   const numEl = document.getElementById('mp-countdown-num');
   ov.style.display = 'flex';
@@ -2201,19 +2457,27 @@ function mpShowResults(rows) {
 // 将来100機規模にする際は距離別にスプライトへ落とすLODをここに足す
 // (ghostMeshes本体はtop-level await中の切断にも耐えるようファイル先頭で宣言)
 
-function buildGhostBalloon(colorIdx, name) {
-  const c = BALLOON_COLORS[colorIdx] || BALLOON_COLORS[0];
+// サーバーが古い(appearance未対応)接続や、色インデックスのみのプレースホルダーからも、
+// 見た目descriptorへ変換できるようにする
+function appearanceOfPlayer(pl) {
+  if (!pl) return DEFAULT_APPEARANCE;
+  if (pl.appearance) return decodeAppearance(pl.appearance);
+  return { pattern: 'alt', colors: [Number.isInteger(pl.color) ? pl.color : 0], soloFill: false };
+}
+
+function buildGhostBalloon(appearance, name) {
+  const app = appearance || DEFAULT_APPEARANCE;
   const g = new THREE.Group(); // 原点=バスケット底面(自機と同じ基準)
   const env = new THREE.Mesh(
     new THREE.SphereGeometry(9, 16, 12),
-    new THREE.MeshLambertMaterial({ color: c.ui }));
+    new THREE.MeshLambertMaterial({ map: buildGoreTexture(false, app) }));
   env.scale.set(1, 1.12, 1);
   env.position.y = 16.5;
   g.add(env);
-  // スカート(自機と同じ寸法。濃い方の色で球皮と馴染ませる)
+  // スカート(自機と同じ寸法・同じ配色ルール)
   const skirt = new THREE.Mesh(
     new THREE.CylinderGeometry(3.0, 1.5, 3.2, 12, 1, true),
-    new THREE.MeshLambertMaterial({ color: c.cols[1], side: THREE.DoubleSide }));
+    new THREE.MeshLambertMaterial({ color: skirtColorFor(app), side: THREE.DoubleSide }));
   skirt.position.y = 5.4;
   g.add(skirt);
   const basket = new THREE.Mesh(
@@ -2256,7 +2520,7 @@ function updateGhosts(rawDt) {
     let g = ghostMeshes.get(s.id);
     if (!g) {
       const pl = MP.room.players.find((p) => p.id === s.id);
-      g = buildGhostBalloon(pl ? pl.color : 0, pl ? pl.name : '???');
+      g = buildGhostBalloon(appearanceOfPlayer(pl), pl ? pl.name : '???');
       g.position.set(s.x, s.y, s.z); // 初回だけ直接置く
       ghostMeshes.set(s.id, g);
       scene.add(g);

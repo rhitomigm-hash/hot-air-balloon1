@@ -42,13 +42,14 @@ export class RoomDO {
     }
     const name = url.searchParams.get('name') || '';
     const color = Number(url.searchParams.get('color'));
+    const appearance = url.searchParams.get('appearance') || '';
     const create = url.searchParams.get('create') === '1';
 
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
     server.accept();
 
-    const res = this.core.join(name, Number.isFinite(color) ? color : 0, create, Date.now());
+    const res = this.core.join(name, Number.isFinite(color) ? color : 0, create, Date.now(), appearance);
     if (res.error) {
       server.send(JSON.stringify({ t: 'error', ...res.error }));
       server.close(4000, res.error.code);

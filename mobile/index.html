@@ -253,14 +253,9 @@
   /* 「ルームを作る」とは別グループだと分かるよう、上に区切り線+補足文を入れて離す */
   .mp-join-row { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #2a3a4a; }
   .mp-join-hint { font-size: 11px; color: #9ab; margin-bottom: 4px; }
-  /* 色パレットはホスト側(#mp-colors)とゲスト入室ダイアログ(#mp-join-colors)で共通 */
-  #mp-colors, #mp-join-colors { display: flex; gap: 5px; flex-wrap: wrap; margin: 8px 0; }
-  #mp-colors button, #mp-join-colors button {
-    width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent;
-    cursor: pointer; padding: 0;
-  }
-  #mp-colors button.sel, #mp-join-colors button.sel {
-    border-color: #fff; box-shadow: 0 0 0 2px rgba(255,255,255,0.35);
+  .balloon-btn-dot {
+    display: inline-block; width: 12px; height: 12px; border-radius: 50%;
+    margin-right: 6px; vertical-align: -1px; border: 1px solid rgba(255,255,255,0.4);
   }
   .mp-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
   .mp-btn {
@@ -284,6 +279,30 @@
     background: rgba(8, 14, 20, 0.92);
     font-family: "Segoe UI", "Yu Gothic UI", sans-serif; color: #e8f0f6;
   }
+  /* 気球の色・柄選択モーダル(ソロ・MP作成・MP参加ゲート、いずれからも開ける
+     独立オーバーレイなので、それらのdisplay状態に関係なく最前面に出す) */
+  #balloon-modal {
+    position: fixed; inset: 0; z-index: 30; display: none;
+    align-items: center; justify-content: center;
+    background: rgba(8, 14, 20, 0.92);
+    font-family: "Segoe UI", "Yu Gothic UI", sans-serif; color: #e8f0f6;
+  }
+  #balloon-modal .b-panel { max-width: 380px; }
+  #balloon-modal-preview { display: block; margin: 0 auto; width: 168px; height: 210px; }
+  .balloon-pattern-row, .balloon-count-row { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 10px; }
+  .balloon-slot { margin-bottom: 8px; }
+  .balloon-swatches { display: flex; gap: 5px; flex-wrap: wrap; margin: 4px 0; }
+  .balloon-swatches button {
+    width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent;
+    cursor: pointer; padding: 0;
+  }
+  .balloon-swatches button.sel { border-color: #fff; box-shadow: 0 0 0 2px rgba(255,255,255,0.35); }
+  #balloon-code-in {
+    width: 90px; text-transform: uppercase; padding: 4px 6px; text-align: center;
+    background: #0d1620; border: 1px solid #2a3a4a; border-radius: 3px;
+    color: #e8f0f6; font-family: Consolas, monospace; font-size: 13px;
+  }
+  #balloon-code-msg { margin-top: 4px; font-size: 12px; color: #ffab91; min-height: 14px; }
   /* 同時離陸カウントダウン */
   #mp-countdown {
     position: fixed; inset: 0; z-index: 15; display: none;
@@ -399,6 +418,8 @@
     <div class="b-title" data-i18n="briefing.title">タスクブリーフィング</div>
     <div class="b-cols">
       <div class="b-left">
+        <div class="b-sub" style="margin-top:0" data-i18n="balloon.sectionTitle">気球の色・柄</div>
+        <div class="mp-row" style="margin-top:0"><button type="button" class="mp-btn" id="balloon-open-btn"></button></div>
         <table class="tasksheet">
           <tr><th data-i18n="task.disciplineLabel">競技</th><td data-i18n="task.disciplineValue">JDG(ジャッジ・ディクレアード・ゴール)</td></tr>
           <tr><th data-i18n="task.targetLabel">ターゲット</th><td data-i18n="task.targetValue">地図上の橙色X</td></tr>
@@ -448,7 +469,7 @@
         <div class="mp-row">
           <input type="text" id="mp-name" maxlength="12" data-i18n-attr="placeholder:mp.namePlaceholder" placeholder="パイロット名">
         </div>
-        <div id="mp-colors"></div>
+        <div class="mp-row"><button type="button" class="mp-btn" id="balloon-open-btn-mp"></button></div>
         <div class="mp-row">
           <button type="button" class="mp-btn primary" id="mp-create" data-i18n="mp.createBtn">ルームを作る</button>
         </div>
@@ -550,9 +571,35 @@
     <div class="mp-row" style="margin-top:10px">
       <input type="text" id="mp-join-name" maxlength="12" data-i18n-attr="placeholder:mp.namePlaceholder" placeholder="パイロット名">
     </div>
-    <div id="mp-join-colors"></div>
+    <div class="mp-row"><button type="button" class="mp-btn" id="balloon-open-btn-mpjoin"></button></div>
     <button type="button" class="mp-btn primary" id="mp-join-go" style="margin-top:8px" data-i18n="mpJoin.goBtn">参加する</button>
     <div id="mp-join-status" style="margin-top:8px;font-size:12px;color:#ffd54f"></div>
+  </div>
+</div>
+
+<div id="balloon-modal">
+  <div class="b-panel">
+    <div class="b-title" data-i18n="balloon.modalTitle">気球の色・柄</div>
+    <canvas id="balloon-modal-preview"></canvas>
+    <div class="b-sub" style="margin-top:6px" data-i18n="balloon.patternLabel">柄</div>
+    <div class="balloon-pattern-row" id="balloon-pattern-row"></div>
+    <div class="b-sub" data-i18n="balloon.colorCountLabel">色数</div>
+    <div class="balloon-count-row" id="balloon-count-row"></div>
+    <div class="balloon-count-row" id="balloon-solofill-row" style="display:none"></div>
+    <div id="balloon-slots"></div>
+    <div class="b-sub" data-i18n="balloon.tapeLabel">ロードテープ</div>
+    <div class="balloon-count-row" id="balloon-tape-row"></div>
+    <div class="b-sub" data-i18n="balloon.codeLabel">コード</div>
+    <div class="mp-row">
+      <input type="text" id="balloon-code-in" maxlength="6">
+      <button type="button" class="mp-btn" id="balloon-code-apply" data-i18n="balloon.codeApplyBtn">適用</button>
+      <button type="button" class="mp-btn" id="balloon-code-copy" data-i18n="balloon.codeCopyBtn">コピー</button>
+    </div>
+    <div id="balloon-code-msg"></div>
+    <div class="mp-row" style="margin-top:10px">
+      <button type="button" class="mp-btn primary" id="balloon-apply-btn" data-i18n="balloon.applyBtn">決定</button>
+      <button type="button" class="mp-btn" id="balloon-cancel-btn" data-i18n="balloon.cancelBtn">閉じる</button>
+    </div>
   </div>
 </div>
 

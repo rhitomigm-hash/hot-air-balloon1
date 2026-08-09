@@ -81,7 +81,7 @@ export class RoomCore {
   // ---- 内部ヘルパ ----
   roster() {
     return [...this.players.values()].map((p) => ({
-      id: p.id, name: p.name, color: p.color, ready: p.ready,
+      id: p.id, name: p.name, color: p.color, appearance: p.appearance, ready: p.ready,
       host: p.id === this.hostId, dropped: p.dropped, landed: p.landed,
       connected: p.connected,
     }));
@@ -107,7 +107,7 @@ export class RoomCore {
   resultsRows() {
     return [...this.players.values()]
       .map((p) => ({
-        id: p.id, name: p.name, color: p.color, dist: p.dist,
+        id: p.id, name: p.name, color: p.color, appearance: p.appearance, dist: p.dist,
         left: p.left || !p.connected,
       }))
       .sort((a, b) => (a.dist ?? Infinity) - (b.dist ?? Infinity));
@@ -123,7 +123,9 @@ export class RoomCore {
   }
 
   // ---- 参加/退出 ----
-  join(name, color, create, now) {
+  // appearance: 気球の柄+配色を表す16進数コード(クライアントのballoon-appearance.js参照)。
+  // サーバー側では中身を解釈せず、他クライアントへそのまま中継するだけの不透明な文字列として扱う
+  join(name, color, create, now, appearance) {
     if (!this.created) {
       if (!create) return { error: { code: 'no_room', msg: 'ルームが存在しません' } };
       this.created = true;
@@ -169,6 +171,8 @@ export class RoomCore {
       id,
       name: String(name || `Pilot ${id}`).slice(0, 12),
       color: Number.isInteger(color) && color >= 0 && color < 12 ? color : 0,
+      appearance: typeof appearance === 'string' && /^[0-9a-fA-F]{1,6}$/.test(appearance)
+        ? appearance.toUpperCase() : null,
       ready: false, launch: null, desired: 1, pos: null, lastSeen: now,
       dropped: false, landed: false, dist: null, left: false,
       connected: true, disconnectedAt: null,
