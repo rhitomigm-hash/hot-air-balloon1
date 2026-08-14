@@ -7,8 +7,10 @@ import { buildTerrain, lonLatToTile } from './terrain.js';
 import { LANG, t, setLang, applyStaticI18n } from './i18n.js';
 import { Room, randomRoomCode, BALLOON_COLORS } from './net.js';
 import {
-  GORES, MAX_COLORS, DEFAULT_APPEARANCE, PATTERN_IDS, PATTERNS, TAPE_COLORS,
-  encodeAppearance, decodeAppearance, colorSlotAt,
+  GORES, MAX_COLORS, DEFAULT_APPEARANCE, PATTERN_IDS, TAPE_COLORS,
+  encodeAppearance, decodeAppearance, colorSlotAt, resolvePattern, isValidAppearanceCode,
+  CUSTOM_PATTERN, GRID_PATTERN, TRI_GRID_PATTERN, DEFAULT_KERNEL,
+  KERNEL_SLICES, KERNEL_KG_VALUES, KERNEL_MAPPINGS, KERNEL_WAVE_PERIODS, KERNEL_KV_MAX,
 } from './balloon-appearance.js';
 
 applyStaticI18n();
@@ -257,10 +259,13 @@ function lighten(hex, k) {
 function buildGoreTexture(bright, appearance) {
   const cv = document.createElement('canvas');
   cv.width = 512;
-  cv.height = 64;
+  const app = appearance || DEFAULT_APPEARANCE;
+  // 三角マス目は対角線をアンチエイリアスで滑らかに見せる必要があるため、
+  // 他の柄より縦解像度を上げる(64pxのままだと1マスの縦幅が数pxしかなく、
+  // 本来直線のはずの対角線がぼやけた階段状にしか見えない)
+  cv.height = app.pattern === TRI_GRID_PATTERN ? 256 : 64;
   const ctx = cv.getContext('2d');
   const w = 512 / GORES;
-  const app = appearance || DEFAULT_APPEARANCE;
   const colorIdxs = app.colors && app.colors.length ? app.colors : [0];
   const palettes = colorIdxs.map((i) => BALLOON_COLORS[i] || BALLOON_COLORS[0]);
 
@@ -276,32 +281,69 @@ function buildGoreTexture(bright, appearance) {
     const cols = bright ? base.cols.map((c) => lighten(c, 0.25)) : base.cols;
     for (let i = 0; i < GORES; i++) {
       ctx.fillStyle = app.soloFill ? cols[0] : cols[i % 2];
-      ctx.fillRect(i * w, 0, w, 64);
+      ctx.fillRect(i * w, 0, w, cv.height);
       if (tape !== 'transparent') {
         ctx.fillStyle = seam;
-        ctx.fillRect(i * w, 0, 2, 64);
+        ctx.fillRect(i * w, 0, 2, cv.height);
       }
     }
   } else {
     // 複数色: パターンに従ってゴア×高さを塗り分ける(各色は代表色uiを使用)
     const filled = palettes.map((p) => (bright ? lighten(p.ui, 0.25) : p.ui));
-    const rows = 64;
+    const rows = cv.height;
     // サファイアのように、実際の球皮パネル数(GORES)とは別に柄自体の見た目の
     // 分割を細かくしたいパターンは fineSlices ヒントに従う。さらに alignSeams
     // 指定があれば継ぎ目テープもその分割に合わせて引く(市松は1マス=1ゴアなので、
     // 継ぎ目が16本のままだとマスの途中を横切って柄が崩れてしまう)
-    const patDef = PATTERNS[app.pattern];
+    const patDef = resolvePattern(app);
     const slices = (patDef && patDef.fineSlices) || GORES;
     const fine = slices !== GORES;
-    const sw = 512 / slices;
-    for (let k = 0; k < slices; k++) {
-      const gv = fine ? (k + 0.5) * GORES / slices : k;
-      const x0 = Math.round(k * sw);
-      const x1 = Math.round((k + 1) * sw);
-      for (let y = 0; y < rows; y++) {
-        const v = (y + 0.5) / rows;
-        ctx.fillStyle = filled[colorSlotAt(app, gv, v)];
-        ctx.fillRect(x0, y, x1 - x0, 1);
+    if (patDef && patDef.subCell && patDef.rows) {
+      // 三角マス目はセルを対角線で割った2枚の三角形として直接描画する。
+      // ピクセル単位で最近傍の色を拾う方式だと、マス目の解像度なりに
+      // 対角線が階段状に見えてしまうため、キャンバスの多角形塗りつぶし
+      // (アンチエイリアス込み)で厳密な直線として描く
+      const S = patDef.slices;
+      const R = patDef.rows.length;
+      const period = patDef.rows[0].length;
+      const cw = 512 / S;
+      for (let r = 0; r < R; r++) {
+        const row = patDef.rows[r];
+        // rows[0]が最下段(裾側)・rows[R-1]が最上段(頂点側)という並びなので、
+        // キャンバス上(y=0が頂点側)には逆順で対応させる
+        const y0 = (R - r - 1) / R * rows;
+        const y1 = (R - r) / R * rows;
+        for (let k = 0; k < S; k++) {
+          const cell = row[k % period];
+          const x0 = k * cw;
+          const x1 = (k + 1) * cw;
+          const colA = filled[Math.min(filled.length - 1, cell.a)];
+          const colB = filled[Math.min(filled.length - 1, cell.b)];
+          // マス全体をまずb色でfillRect(他の柄と同じ塗り方なので継ぎ目が出ない)
+          // し、その上からa側の三角形だけ重ねて塗る。アンチエイリアスが掛かる
+          // 境界を対角線1本だけに絞ることで、マス目の外枠に余計な継ぎ目が
+          // 出ないようにする
+          ctx.fillStyle = colB;
+          ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+          ctx.beginPath();
+          if (cell.dir === 0) { ctx.moveTo(x0, y0); ctx.lineTo(x0, y1); ctx.lineTo(x1, y1); }
+          else { ctx.moveTo(x0, y0); ctx.lineTo(x1, y0); ctx.lineTo(x0, y1); }
+          ctx.closePath();
+          ctx.fillStyle = colA;
+          ctx.fill();
+        }
+      }
+    } else {
+      const sw = 512 / slices;
+      for (let k = 0; k < slices; k++) {
+        const gv = fine ? (k + 0.5) * GORES / slices : k;
+        const x0 = Math.round(k * sw);
+        const x1 = Math.round((k + 1) * sw);
+        for (let y = 0; y < rows; y++) {
+          const v = (y + 0.5) / rows;
+          ctx.fillStyle = filled[colorSlotAt(app, gv, v)];
+          ctx.fillRect(x0, y, x1 - x0, 1);
+        }
       }
     }
     if (tape !== 'transparent') {
@@ -309,7 +351,7 @@ function buildGoreTexture(bright, appearance) {
       const seamW = 512 / seams;
       for (let i = 0; i < seams; i++) {
         ctx.fillStyle = seam;
-        ctx.fillRect(Math.round(i * seamW), 0, 2, 64);
+        ctx.fillRect(Math.round(i * seamW), 0, 2, cv.height);
       }
     }
   }
@@ -324,7 +366,7 @@ function buildGoreTexture(bright, appearance) {
 function skirtColorFor(appearance) {
   const app = appearance || DEFAULT_APPEARANCE;
   const cols = app.colors && app.colors.length ? app.colors : [0];
-  const patDef = PATTERNS[app.pattern];
+  const patDef = resolvePattern(app);
   const useTop = !!(patDef && patDef.skirtUsesTopColor) && cols.length > 1;
   const pal = BALLOON_COLORS[useTop ? cols[cols.length - 1] : cols[0]] || BALLOON_COLORS[0];
   // 複数色の球皮は代表色uiで塗られているので、最上段に合わせるときもuiを使う
@@ -1109,6 +1151,9 @@ function openBalloonModal() {
   balloonDraft = {
     pattern: myAppearance.pattern, colors: [...myAppearance.colors],
     soloFill: myAppearance.soloFill, tape: myAppearance.tape,
+    kernel: { ...DEFAULT_KERNEL, ...(myAppearance.kernel || {}) },
+    grid: myAppearance.grid || null, // 展開図から取り込んだ柄(コード貼り付けで入る)
+    triGrid: myAppearance.triGrid || null, // 三角マス目から取り込んだ柄(同上)
   };
   document.getElementById('balloon-code-msg').textContent = '';
   startPreviewAnim(); // renderBalloonModal()がプレビューへ適用する前にpreviewBalloonを用意しておく
@@ -1120,15 +1165,73 @@ function closeBalloonModal() {
   stopPreviewAnim();
 }
 
+// カスタム柄のパラメータ1つぶんの行(選択肢ボタン列)を組み立てる。
+// values: 実際に入る値の配列、label: 値→表示文字列
+function kernelRowHtml(field, values, label) {
+  const cur = balloonDraft.kernel[field];
+  return `<div class="balloon-kernel-row"><div class="b-hint">${esc(t(`balloon.kernel.${field}`))}</div>`
+    + `<div class="balloon-kernel-opts" data-field="${field}">`
+    + values.map((v, i) =>
+      `<button type="button" class="mp-btn${v === cur ? ' primary' : ''}" data-i="${i}">${esc(label(v))}</button>`).join('')
+    + '</div></div>';
+}
+
+// 傾き(Kg)の表示。'N'/'-N'は色数に追随する特殊値なので専用の文言を出す
+function kernelKgLabel(v) {
+  if (v === 'N') return t('balloon.kernel.turn');
+  if (v === '-N') return t('balloon.kernel.turnRev');
+  if (v === 0) return t('balloon.kernel.none');
+  return v > 0 ? `+${v}` : String(v);
+}
+
+function renderKernelSection() {
+  const box = document.getElementById('balloon-kernel');
+  if (balloonDraft.pattern !== CUSTOM_PATTERN) {
+    box.style.display = 'none';
+    box.innerHTML = '';
+    return;
+  }
+  box.style.display = '';
+  // 縦の段数(Kv)は0〜31と刻みが細かいので、よく使う値だけをボタンにする
+  const kvChoices = [0, 1, 2, 3, 4, 5, 6, 8, 10, 13, 16, 20, 24, KERNEL_KV_MAX];
+  box.innerHTML = `<div class="b-hint balloon-kernel-title">${esc(t('balloon.kernelTitle'))}</div>`
+    + kernelRowHtml('slices', KERNEL_SLICES, (v) => String(v))
+    + kernelRowHtml('kv', kvChoices, (v) => (v === 0 ? t('balloon.kernel.none') : String(v)))
+    + kernelRowHtml('kg', KERNEL_KG_VALUES, kernelKgLabel)
+    + kernelRowHtml('mapping', KERNEL_MAPPINGS, (v) => t(`balloon.mapping.${v}`))
+    + kernelRowHtml('wavePeriods', KERNEL_WAVE_PERIODS, (v) => (v === 0 ? t('balloon.kernel.none') : String(v)))
+    + kernelRowHtml('waveAmp', [0, 1, 2, 3], (v) => (v === 0 ? t('balloon.kernel.none') : String(v)))
+    + kernelRowHtml('checker', [false, true], (v) => (v ? t('balloon.kernel.checker') : t('balloon.kernel.none')));
+
+  const optionValues = {
+    slices: KERNEL_SLICES, kv: kvChoices, kg: KERNEL_KG_VALUES,
+    mapping: KERNEL_MAPPINGS, wavePeriods: KERNEL_WAVE_PERIODS, waveAmp: [0, 1, 2, 3],
+    checker: [false, true],
+  };
+  box.querySelectorAll('.balloon-kernel-opts').forEach((row) => {
+    row.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-i]');
+      if (!b) return;
+      balloonDraft.kernel[row.dataset.field] = optionValues[row.dataset.field][Number(b.dataset.i)];
+      renderBalloonModal();
+    });
+  });
+}
+
 function renderBalloonModal() {
   const patRow = document.getElementById('balloon-pattern-row');
-  patRow.innerHTML = PATTERN_IDS.map((id) =>
+  // プリセットの4種に加え、末尾にパラメータで自作する「カスタム」を並べる
+  patRow.innerHTML = [...PATTERN_IDS, CUSTOM_PATTERN].map((id) =>
     `<button type="button" class="mp-btn${id === balloonDraft.pattern ? ' primary' : ''}" data-pattern="${id}">${esc(t(`balloon.pattern.${id}`))}</button>`)
     .join('');
   [...patRow.children].forEach((b) => b.addEventListener('click', () => {
     balloonDraft.pattern = b.dataset.pattern;
     renderBalloonModal();
   }));
+
+  renderKernelSection();
+  renderGridNote();
+  renderTriGridNote();
 
   const countRow = document.getElementById('balloon-count-row');
   const n = balloonDraft.colors.length;
@@ -1193,8 +1296,51 @@ function renderBalloonModal() {
     renderBalloonModal();
   }));
 
-  document.getElementById('balloon-code-in').value = encodeAppearance(balloonDraft);
-  applyAppearanceToBalloon(previewBalloon, balloonDraft);
+  const draft = appearanceFromDraft();
+  document.getElementById('balloon-code-in').value = encodeAppearance(draft);
+  applyAppearanceToBalloon(previewBalloon, draft);
+}
+
+// 展開図から取り込んだ柄(コード貼り付けで入る)を選んでいるときの表示。
+// 柄ボタンには並ばないので、いま何が入っているかをここで知らせる
+function renderGridNote() {
+  const box = document.getElementById('balloon-gridnote');
+  if (balloonDraft.pattern !== GRID_PATTERN || !balloonDraft.grid) {
+    box.style.display = 'none';
+    box.textContent = '';
+    return;
+  }
+  const g = balloonDraft.grid;
+  box.style.display = '';
+  box.textContent = t('balloon.gridNote', { s: g.slices, r: g.rows.length });
+}
+
+// 三角マス目(1マスを対角線で2色に割る柄。コード貼り付けで入る)を選んでいる
+// ときの表示。renderGridNote()と同じ考え方
+function renderTriGridNote() {
+  const box = document.getElementById('balloon-trigridnote');
+  if (balloonDraft.pattern !== TRI_GRID_PATTERN || !balloonDraft.triGrid) {
+    box.style.display = 'none';
+    box.textContent = '';
+    return;
+  }
+  const g = balloonDraft.triGrid;
+  box.style.display = '';
+  box.textContent = t('balloon.triGridNote', { s: g.slices, r: g.rows.length });
+}
+
+// 編集中の下書きから、実際に保存・共有する見た目を作る。カーネルのパラメータや
+// 展開図のマス目は、その柄を選んでいるときだけ載せる
+// (プリセットに余計なキーが付かないようにする)
+function appearanceFromDraft() {
+  const app = {
+    pattern: balloonDraft.pattern, colors: [...balloonDraft.colors],
+    soloFill: balloonDraft.soloFill, tape: balloonDraft.tape,
+  };
+  if (balloonDraft.pattern === CUSTOM_PATTERN) app.kernel = { ...balloonDraft.kernel };
+  if (balloonDraft.pattern === GRID_PATTERN && balloonDraft.grid) app.grid = balloonDraft.grid;
+  if (balloonDraft.pattern === TRI_GRID_PATTERN && balloonDraft.triGrid) app.triGrid = balloonDraft.triGrid;
+  return app;
 }
 
 // ---- 色選択モーダルの3Dプレビュー(実機と同じbuildBalloon()を再利用し、
@@ -1242,19 +1388,18 @@ function initBalloonModalUI() {
   }
   document.getElementById('balloon-cancel-btn').addEventListener('click', closeBalloonModal);
   document.getElementById('balloon-apply-btn').addEventListener('click', () => {
-    setMyAppearance({
-      pattern: balloonDraft.pattern, colors: [...balloonDraft.colors],
-      soloFill: balloonDraft.soloFill, tape: balloonDraft.tape,
-    });
+    setMyAppearance(appearanceFromDraft());
     closeBalloonModal();
   });
   document.getElementById('balloon-code-apply').addEventListener('click', () => {
     const raw = document.getElementById('balloon-code-in').value.trim();
-    if (!/^[0-9a-fA-F]{1,6}$/.test(raw)) {
+    if (!isValidAppearanceCode(raw)) {
       document.getElementById('balloon-code-msg').textContent = t('balloon.codeInvalid');
       return;
     }
-    balloonDraft = decodeAppearance(raw);
+    // カスタム柄以外のコードを貼られてもパラメータ欄が空にならないよう、
+    // 編集中のカーネル設定は残したまま上書きする
+    balloonDraft = { kernel: { ...balloonDraft.kernel }, grid: null, triGrid: null, ...decodeAppearance(raw) };
     document.getElementById('balloon-code-msg').textContent = '';
     renderBalloonModal();
   });

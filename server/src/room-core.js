@@ -123,8 +123,11 @@ export class RoomCore {
   }
 
   // ---- 参加/退出 ----
-  // appearance: 気球の柄+配色を表す16進数コード(クライアントのballoon-appearance.js参照)。
-  // サーバー側では中身を解釈せず、他クライアントへそのまま中継するだけの不透明な文字列として扱う
+  // appearance: 気球の柄+配色を表す共有コード(クライアントのballoon-appearance.js参照)。
+  // 現行の柄・4色以内なら16進6桁、カスタム柄や5色目を使うと'G'で始まる可変長の
+  // Base32コード(最長20文字)、展開図のマス目をそのまま載せる柄は'H'で始まる長いコード
+  // (実機相当の24列×13段で約50文字、上限512文字)になる。サーバー側では中身を解釈せず、
+  // 他クライアントへそのまま中継するだけの不透明な文字列として扱うので、長さと文字種だけを見る
   join(name, color, create, now, appearance) {
     if (!this.created) {
       if (!create) return { error: { code: 'no_room', msg: 'ルームが存在しません' } };
@@ -145,6 +148,12 @@ export class RoomCore {
       ghost.connected = true;
       ghost.disconnectedAt = null;
       ghost.lastSeen = now;
+      // 再接続時に送られてきた最新のcolor/appearanceも反映する(反映しないと、初回参加時点の
+      // 見た目に固定されたまま、後から選び直した柄がずっと他の全員へ配られなくなる)
+      if (Number.isInteger(color) && color >= 0 && color < 16) ghost.color = color;
+      if (typeof appearance === 'string' && /^[0-9A-Za-z]{1,512}$/.test(appearance)) {
+        ghost.appearance = appearance.toUpperCase();
+      }
       const hello = {
         to: ghost.id,
         msg: {
@@ -170,8 +179,8 @@ export class RoomCore {
     const p = {
       id,
       name: String(name || `Pilot ${id}`).slice(0, 12),
-      color: Number.isInteger(color) && color >= 0 && color < 12 ? color : 0,
-      appearance: typeof appearance === 'string' && /^[0-9a-fA-F]{1,6}$/.test(appearance)
+      color: Number.isInteger(color) && color >= 0 && color < 16 ? color : 0,
+      appearance: typeof appearance === 'string' && /^[0-9A-Za-z]{1,512}$/.test(appearance)
         ? appearance.toUpperCase() : null,
       ready: false, launch: null, desired: 1, pos: null, lastSeen: now,
       dropped: false, landed: false, dist: null, left: false,

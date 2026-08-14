@@ -22,7 +22,9 @@ export function randomRoomCode() {
   return s;
 }
 
-// 球皮カラーパレット(12色)。[外面の濃淡2色, 縫い目, UI表示用]
+// 球皮カラーパレット(16色)。[外面の濃淡2色, 縫い目, UI表示用]
+// 16色なのは、共有コードで1色=4bitを割り当てているため(4bitで表せる上限がちょうど16色)。
+// 12色から増やしてもコードの桁数は増えない
 export const BALLOON_COLORS = [
   { name: '赤',     cols: ['#c62828', '#a81f1f'], seam: '#7a1515', ui: '#e53935' },
   { name: '青',     cols: ['#1565c0', '#0d47a1'], seam: '#0a3576', ui: '#1e88e5' },
@@ -36,6 +38,10 @@ export const BALLOON_COLORS = [
   { name: '黒',     cols: ['#37474f', '#263238'], seam: '#101519', ui: '#546e7a' },
   { name: '黄緑',   cols: ['#9e9d24', '#827717'], seam: '#5a5210', ui: '#c0ca33' },
   { name: '茶',     cols: ['#6d4c41', '#4e342e'], seam: '#33211c', ui: '#8d6e63' },
+  { name: '藍',     cols: ['#283593', '#1a237e'], seam: '#111a5c', ui: '#3949ab' },
+  { name: '山吹',   cols: ['#ffa000', '#ff6f00'], seam: '#b34d00', ui: '#ffca28' },
+  { name: 'ラベンダー', cols: ['#9575cd', '#7e57c2'], seam: '#5b3fa0', ui: '#b39ddb' },
+  { name: 'ミント', cols: ['#4db6ac', '#00897b'], seam: '#00584e', ui: '#80cbc4' },
 ];
 
 export class Room {
