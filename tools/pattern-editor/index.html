@@ -1,0 +1,2538 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>気球パターン・エディタ</title>
+<style>
+  :root {
+    --bg: #eceee4;
+    --surface: #ffffff;
+    --surface-2: #e4e7da;
+    --line: #ccd0bd;
+    --line-soft: #dfe3d3;
+    --ink: #19221e;
+    --muted: #5d685a;
+    --accent: #cf5514;
+    --accent-soft: #f2b98f;
+    --accent-ink: #7a3208;
+    --accent-contrast: #fff8f2;
+    --indigo: #2f3d99;
+    --indigo-soft: #dee2f4;
+    --good: #2c8a5a;
+    --warn: #a5760a;
+    --danger: #bd3838;
+    --shadow: 0 16px 36px -24px rgba(25, 34, 30, 0.4);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #11151a;
+      --surface: #1a2026;
+      --surface-2: #212a31;
+      --line: #323d45;
+      --line-soft: #2a343b;
+      --ink: #ecf0e9;
+      --muted: #96a49b;
+      --accent: #ff8a4a;
+      --accent-soft: #9d5327;
+      --accent-ink: #ffd9b8;
+      --accent-contrast: #2a1608;
+      --indigo: #8a93ea;
+      --indigo-soft: #242a4f;
+      --good: #5cca8f;
+      --warn: #ffcd58;
+      --danger: #ff8686;
+      --shadow: 0 16px 42px -22px rgba(0, 0, 0, 0.65);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #11151a;
+    --surface: #1a2026;
+    --surface-2: #212a31;
+    --line: #323d45;
+    --line-soft: #2a343b;
+    --ink: #ecf0e9;
+    --muted: #96a49b;
+    --accent: #ff8a4a;
+    --accent-soft: #9d5327;
+    --accent-ink: #ffd9b8;
+    --accent-contrast: #2a1608;
+    --indigo: #8a93ea;
+    --indigo-soft: #242a4f;
+    --good: #5cca8f;
+    --warn: #ffcd58;
+    --danger: #ff8686;
+    --shadow: 0 16px 42px -22px rgba(0, 0, 0, 0.65);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Yu Gothic", "Yu Gothic UI", sans-serif;
+    line-height: 1.6;
+    padding: 26px 18px 64px;
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  .page { max-width: 1280px; margin: 0 auto; }
+  ::selection { background: var(--accent-soft); color: var(--accent-contrast); }
+
+  .eyebrow {
+    font-family: "Century Gothic", "Avenir Next", ui-rounded, -apple-system, sans-serif;
+    text-transform: uppercase; letter-spacing: 0.18em; font-size: 11px;
+    color: var(--indigo); font-weight: 700;
+  }
+  h1 {
+    font-family: "Century Gothic", "Avenir Next", ui-rounded, -apple-system, sans-serif;
+    font-weight: 700; font-size: clamp(23px, 3.2vw, 32px); margin: 7px 0 9px; text-wrap: balance;
+  }
+  header p.lede { max-width: 68ch; color: var(--muted); font-size: 14px; margin: 0 0 24px; }
+  h2 {
+    font-family: "Century Gothic", "Avenir Next", ui-rounded, -apple-system, sans-serif;
+    font-size: 12.5px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); margin: 0 0 12px;
+  }
+  h3 { font-size: 13.5px; margin: 0 0 7px; }
+  code, .mono { font-family: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace; }
+
+  .panel {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 15px;
+    padding: 18px; box-shadow: var(--shadow);
+  }
+  .top { display: grid; grid-template-columns: minmax(300px, 0.92fr) minmax(320px, 1.08fr); gap: 18px; align-items: start; }
+  @media (max-width: 900px) { .top { grid-template-columns: 1fr; } }
+
+  /* ---- 3D viewer ---- */
+  .view-frame {
+    position: relative; border-radius: 12px; overflow: hidden;
+    border: 1px solid var(--line); background: #253055; aspect-ratio: 1 / 1;
+  }
+  #glCanvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+  #glCanvas.dragging { cursor: grabbing; }
+  .view-hud {
+    position: absolute; left: 10px; bottom: 10px; display: flex; gap: 6px; flex-wrap: wrap;
+  }
+  .view-hud button {
+    font-size: 11.5px; padding: 4px 9px; border-radius: 7px; cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.28); background: rgba(12,18,30,0.62);
+    color: #f1f5ff; font-family: inherit; backdrop-filter: blur(3px);
+  }
+  .view-hud button:hover { border-color: rgba(255,255,255,0.6); }
+  .view-hud button.on { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); font-weight: 700; }
+  .view-hint { position: absolute; right: 10px; top: 9px; font-size: 11px; color: rgba(238,244,255,0.75); }
+  .gl-fallback { display: none; padding: 20px; color: #f1f5ff; font-size: 13px; }
+
+  .readout { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px 15px; font-size: 12.5px; color: var(--muted); }
+  .readout b { color: var(--ink); font-weight: 600; }
+
+  /* ---- controls ---- */
+  fieldset { border: 0; padding: 0; margin: 0 0 18px; }
+  fieldset:last-of-type { margin-bottom: 0; }
+  legend {
+    font-family: "Century Gothic", "Avenir Next", ui-rounded, -apple-system, sans-serif;
+    font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--accent); font-weight: 700; margin-bottom: 9px; padding: 0;
+  }
+  .seg { display: flex; gap: 5px; flex-wrap: wrap; }
+  .seg button {
+    flex: 1 1 auto; min-width: 58px; padding: 6px 9px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--surface-2); color: var(--ink);
+    font-size: 12.5px; cursor: pointer; font-family: inherit;
+  }
+  .seg button.active { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); font-weight: 700; }
+  .seg button:hover:not(.active) { border-color: var(--accent); }
+  .seg button:focus-visible, .btn:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; }
+
+  select, input[type="text"], input[type="file"] {
+    width: 100%; padding: 7px 9px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--surface-2); color: var(--ink); font-size: 12.5px; font-family: inherit;
+  }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .field { margin-bottom: 12px; }
+  .field:last-child { margin-bottom: 0; }
+  .field-label { display: flex; justify-content: space-between; align-items: baseline; font-size: 12.5px; margin-bottom: 5px; gap: 8px; }
+  .field-label .val {
+    font-family: ui-monospace, monospace; color: var(--accent-ink); background: var(--indigo-soft);
+    padding: 1px 7px; border-radius: 6px; font-size: 11.5px;
+  }
+  .num-row { display: flex; align-items: center; gap: 9px; }
+  .num-row input[type="range"] { flex: 1; }
+  .num {
+    width: 48px; text-align: center; font-family: ui-monospace, monospace; padding: 4px;
+    border-radius: 6px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); font-size: 12.5px;
+  }
+  input[type="range"] { width: 100%; accent-color: var(--accent); }
+  .hint { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+  .checkline { display: flex; align-items: center; gap: 7px; font-size: 12.5px; }
+  .checkline input { accent-color: var(--accent); }
+
+  .btn {
+    padding: 7px 13px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--surface-2); color: var(--ink); font-size: 12.5px; cursor: pointer; font-family: inherit;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent-ink); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); font-weight: 700; }
+  .btn.primary:hover { color: var(--accent-contrast); filter: brightness(1.07); }
+  .btn.ghost { background: transparent; }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .callout {
+    font-size: 12.5px; color: var(--muted); background: var(--surface-2);
+    border: 1px dashed var(--line); border-radius: 9px; padding: 9px 11px; margin-top: 10px;
+  }
+
+  /* ---- palette slots ---- */
+  .slot-strip { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .slot-chip {
+    display: flex; align-items: center; gap: 6px; padding: 4px 8px 4px 5px;
+    border: 2px solid transparent; border-radius: 9px; background: var(--surface-2);
+    cursor: pointer; font-size: 12px; font-family: inherit; color: var(--ink);
+  }
+  .slot-chip.sel { border-color: var(--accent); }
+  .slot-chip .dot { width: 15px; height: 15px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.25); }
+  .slot-chip .num-badge { font-family: ui-monospace, monospace; font-size: 10.5px; color: var(--muted); }
+  .slot-detail { border: 1px solid var(--line); background: var(--surface-2); border-radius: 9px; padding: 9px 10px; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+  .swatch { width: 23px; height: 23px; border-radius: 6px; border: 2px solid transparent; cursor: pointer; padding: 0; }
+  .swatch.selected { border-color: var(--ink); box-shadow: 0 0 0 2px var(--accent); }
+  .cap-note { font-size: 11.5px; color: var(--warn); margin-top: 6px; }
+
+  /* ---- gore chart ---- */
+  .chart-panel { margin-top: 18px; }
+  .chart-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; }
+  .chart-tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .chart-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 11px; background: var(--surface-2); }
+  #chartCanvas { display: block; min-width: 720px; width: 100%; height: auto; touch-action: none; }
+  #chartCanvas.painting { cursor: crosshair; }
+  .chart-legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; font-size: 12px; color: var(--muted); }
+
+  /* ---- 参考画像の窓(ページ内に浮かぶ独立ウィンドウ) ---- */
+  #refWindow {
+    position: fixed; z-index: 40; width: 460px; min-width: 240px; min-height: 200px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: 0 24px 60px -20px rgba(0,0,0,0.45); display: none; flex-direction: column;
+    overflow: hidden; resize: both;
+  }
+  #refWindow.open { display: flex; }
+  .refwin-bar {
+    display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+    background: var(--surface-2); border-bottom: 1px solid var(--line); cursor: move; user-select: none;
+  }
+  .refwin-title { font-size: 12.5px; font-weight: 600; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .refwin-bar button {
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+    border-radius: 6px; font-size: 12px; line-height: 1; padding: 4px 8px; cursor: pointer; font-family: inherit;
+  }
+  .refwin-bar button:hover { border-color: var(--accent); color: var(--accent-ink); }
+  .refwin-body {
+    flex: 1; overflow: auto; background:
+      linear-gradient(45deg, var(--surface-2) 25%, transparent 25%) -6px 0/12px 12px,
+      linear-gradient(-45deg, var(--surface-2) 25%, transparent 25%) -6px 0/12px 12px,
+      linear-gradient(45deg, transparent 75%, var(--surface-2) 75%) -6px 0/12px 12px,
+      linear-gradient(-45deg, transparent 75%, var(--surface-2) 75%) -6px 0/12px 12px, var(--surface);
+  }
+  .refwin-body img { display: block; transform-origin: 0 0; }
+  .refwin-empty { padding: 26px 18px; font-size: 12.5px; color: var(--muted); text-align: center; }
+
+  /* ---- export ---- */
+  .export-panel { margin-top: 18px; border-left: 4px solid var(--indigo); display: grid; gap: 16px; grid-template-columns: minmax(240px, 1.25fr) minmax(230px, 1fr); }
+  @media (max-width: 760px) { .export-panel { grid-template-columns: 1fr; } }
+  .label-line { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; flex-wrap: wrap; }
+  .pill { display: inline-block; font-size: 10.5px; padding: 2px 9px; border-radius: 99px; font-family: ui-monospace, monospace; font-weight: 600; }
+  .pill.v0 { background: rgba(44,138,90,0.16); color: var(--good); }
+  .pill.v1 { background: var(--indigo-soft); color: var(--indigo); }
+  .pill.none { background: rgba(189,56,56,0.14); color: var(--danger); }
+  .code-row { display: flex; gap: 8px; }
+  #codeOut { flex: 1; font-size: 16px; padding: 9px 11px; text-transform: uppercase; }
+  .copy-msg { font-size: 11.5px; color: var(--good); margin-top: 5px; min-height: 14px; }
+  pre.snippet {
+    margin: 0; padding: 11px 13px; background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: 9px; font-size: 12px; overflow-x: auto; color: var(--ink); max-height: 260px;
+  }
+
+  .notes { margin-top: 22px; }
+  .notes-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(265px, 1fr)); gap: 14px; }
+  .note-card { background: var(--surface); border: 1px solid var(--line); border-radius: 13px; padding: 16px 18px; box-shadow: var(--shadow); }
+  .note-card h3 { color: var(--accent-ink); }
+  .note-card p, .note-card li { font-size: 13px; color: var(--muted); }
+  .note-card b { color: var(--ink); }
+  .note-card ul { margin: 6px 0 0; padding-left: 1.1em; }
+  footer { margin-top: 26px; font-size: 11.5px; color: var(--muted); text-align: center; }
+
+  /* ---- 言語選択 ---- */
+  .lang-select {
+    width: auto; flex: 0 0 auto; padding: 6px 8px; font-size: 12px;
+  }
+  .skirt-hint { font-size: 11.5px; color: var(--muted); margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); }
+  .skirt-hint b { color: var(--ink); }
+
+  /* ---- スマホ・縦長画面向け ----
+   * 900px以下は.topが既に1カラムになるため、ここではさらに狭い(概ねスマホ縦持ち)
+   * 画面向けに、タッチ操作の当たり判定・余白・折り返しを調整する。レイアウトの
+   * 骨格(2カラム→1カラム化など)は900px側のルールと共通のまま変えない */
+  @media (max-width: 640px) {
+    body { padding: 16px 12px 48px; }
+    .panel { padding: 14px; border-radius: 12px; }
+    h1 { font-size: clamp(20px, 6vw, 26px); }
+    header p.lede { font-size: 13px; margin-bottom: 18px; }
+
+    /* ボタン・入力欄をタッチしやすい高さに */
+    .btn, .seg button, select, input[type="text"] { min-height: 40px; }
+    .num { min-height: 34px; }
+
+    /* 上部の保存/読込ツールバーは項目が多いので、スマホでは折り返して
+       それぞれ幅いっぱいに広げる(横スクロールや潰れたタップ領域を避ける) */
+    #savePanel .btn-row { flex-direction: column; align-items: stretch; }
+    #savePanel .btn-row > * { flex: 1 1 auto; width: 100%; margin: 0; }
+    #savePanel .btn-row > span[style] { display: none; }
+
+    .seg { gap: 6px; }
+    .seg button { min-width: 0; flex: 1 1 40%; }
+
+    .row2 { grid-template-columns: 1fr; }
+
+    /* 展開図は列数によっては画面より広くなるため、.chart-scrollの横スクロールに任せる。
+       ここではキャンバスの最小幅だけ少し抑えて、最初のスクロール量を減らす */
+    #chartCanvas { min-width: 560px; }
+
+    .code-row { flex-direction: column; align-items: stretch; }
+    .code-row .btn { width: 100%; }
+
+    .export-panel { border-left: none; border-top: 4px solid var(--indigo); padding-top: 14px; }
+
+    /* 参考画像の窓は画面幅を超えないようにする(PCの固定460pxのままだと
+       スマホ画面からはみ出す) */
+    #refWindow { width: min(460px, 92vw) !important; max-width: 92vw; }
+
+    .notes-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <header>
+    <div class="label-line" style="justify-content:space-between; flex-wrap:wrap">
+      <div class="eyebrow">Balloon Envelope Studio</div>
+      <select id="langSelect" class="lang-select" aria-label="Language"></select>
+    </div>
+    <h1 data-i18n="title">気球パターン・エディタ</h1>
+    <p class="lede" data-i18n-html="lede">
+      ゲーム本体(<code>balloon-appearance.js</code>)と同じ計算式・同じ形状で描いています。
+      左は実機と同じ楕円体の球皮をドラッグで回せる3Dプレビュー、下はメーカー図面と同じ「列×段」のマス目。
+      図面を別の窓に出して見比べながらマスを塗れば、実機の柄をそのまま書き写せます。
+    </p>
+  </header>
+
+  <section class="panel" id="savePanel" aria-label="作業の保存・読み込み" data-i18n-aria="save.panel" style="margin-bottom:18px">
+    <div class="btn-row" style="align-items:center">
+      <button type="button" class="btn ghost" id="undoBtn" data-i18n="save.undo" data-i18n-title="save.undoTitle" title="元に戻す (Ctrl+Z)">↶ 元に戻す</button>
+      <button type="button" class="btn ghost" id="redoBtn" data-i18n="save.redo" data-i18n-title="save.redoTitle" title="やり直す (Ctrl+Shift+Z)">↷ やり直す</button>
+      <span style="flex:1 1 auto; min-width:8px"></span>
+      <input type="text" id="saveName" data-i18n-placeholder="save.namePlaceholder" placeholder="作品名" style="width:150px; flex:0 0 auto">
+      <button type="button" class="btn ghost" id="saveNamedBtn" data-i18n="save.saveNamed">名前を付けて保存</button>
+      <select id="savedList" style="width:190px; flex:0 0 auto"><option value="" data-i18n="save.savedListEmpty">保存した作品…</option></select>
+      <button type="button" class="btn ghost" id="loadNamedBtn" data-i18n="save.load" disabled>読み込む</button>
+      <button type="button" class="btn ghost" id="deleteNamedBtn" data-i18n="save.delete" disabled>削除</button>
+      <button type="button" class="btn ghost" id="exportFileBtn" data-i18n="save.exportFile">ファイルに書き出す</button>
+      <label class="btn ghost" style="margin:0; display:inline-flex; align-items:center; cursor:pointer">
+        <span data-i18n="save.importFile">ファイルから読み込む</span>
+        <input type="file" id="importFile" accept="application/json" style="display:none">
+      </label>
+    </div>
+    <div class="hint" id="saveMsg" style="margin-top:7px; min-height:14px"></div>
+    <div class="hint" id="kbdHint" style="margin-top:2px">
+      キーボード: <b>↑↓</b>で色スロットを切り替え / <b>←→</b>で選んだスロットの色を変える /
+      <b>Ctrl+Z</b>(<b>⌘+Z</b>)で元に戻す / <b>Ctrl+Shift+Z</b>でやり直す
+    </div>
+  </section>
+
+  <div class="top">
+    <section class="panel" aria-label="3Dプレビュー" data-i18n-aria="preview.panel">
+      <h2 data-i18n="preview.heading">3Dプレビュー</h2>
+      <div class="view-frame">
+        <canvas id="glCanvas"></canvas>
+        <div class="gl-fallback" id="glFallback" data-i18n="preview.noWebgl">
+          この環境ではWebGLが使えないため、3Dプレビューを表示できません。下のマス目と数式の編集はそのまま使えます。
+        </div>
+        <div class="view-hint" data-i18n="preview.hint">ドラッグで回転 / ホイールで拡大</div>
+        <div class="view-hud">
+          <button type="button" id="autoBtn" data-i18n="preview.auto">自動回転</button>
+          <button type="button" id="viewResetBtn" data-i18n="preview.reset">視点リセット</button>
+          <button type="button" id="insideBtn" data-i18n="preview.inside">内側から見る</button>
+        </div>
+      </div>
+      <div class="readout" id="readout"></div>
+    </section>
+
+    <section class="panel" aria-label="コントロール" data-i18n-aria="controls.panel">
+      <h2 data-i18n="controls.heading">コントロール</h2>
+
+      <fieldset>
+        <legend data-i18n="controls.modeLegend">柄のつくり方</legend>
+        <div class="seg" id="modeSeg">
+          <button type="button" data-mode="formula" data-i18n="controls.modeFormula">数式でつくる</button>
+          <button type="button" data-mode="paint" data-i18n="controls.modePaint">マス目を直接塗る</button>
+          <button type="button" data-mode="triPaint" data-i18n="controls.modeTriPaint">マスを三角パネルで塗る</button>
+        </div>
+        <div class="hint" id="modeHint"></div>
+      </fieldset>
+
+      <fieldset id="presetField">
+        <legend data-i18n="controls.presetLegend">下敷きにする柄</legend>
+        <div class="seg" id="patternSeg"></div>
+        <div class="callout" id="presetNote" style="display:none"></div>
+      </fieldset>
+
+      <fieldset id="kernelField">
+        <legend data-i18n="controls.kernelLegend">数式のパラメータ</legend>
+
+        <div class="field">
+          <div class="field-label"><span data-i18n="controls.kv">縦の段数 Kv</span></div>
+          <div class="num-row">
+            <input type="range" id="kvSlider" min="0" max="31" step="1" aria-label="縦の段数" data-i18n-aria="controls.kv">
+            <input type="text" id="kvNum" class="num" inputmode="numeric" aria-label="縦の段数の数値" data-i18n-aria="controls.kvNumAria">
+          </div>
+          <div class="hint" data-i18n="controls.kvHint">頂点からスカートまでに色が何段進むか</div>
+        </div>
+
+        <div class="field">
+          <div class="field-label"><span data-i18n="controls.kg">傾き Kg(一周で進む段数)</span></div>
+          <select id="kgSelect" aria-label="傾き" data-i18n-aria="controls.kg"></select>
+          <div class="hint" data-i18n="controls.kgHint">符号が巻き方向。「N」は色数が変わっても一周でちょうど1巡する特殊値</div>
+        </div>
+
+        <div class="field">
+          <div class="field-label"><span data-i18n="controls.mapping">色の並べ方</span></div>
+          <div class="seg" id="mappingSeg"></div>
+          <div class="hint" id="mappingHint"></div>
+        </div>
+
+        <div class="row2">
+          <div class="field">
+            <div class="field-label"><span data-i18n="controls.waveN">波の数</span></div>
+            <div class="seg" id="waveNSeg"></div>
+          </div>
+          <div class="field">
+            <div class="field-label"><span data-i18n="controls.waveA">波の高さ</span></div>
+            <div class="seg" id="waveASeg"></div>
+          </div>
+        </div>
+
+        <div class="checkline">
+          <input type="checkbox" id="checkerBox">
+          <label for="checkerBox" data-i18n="controls.checker">隣り合うマスを市松(互い違い)にする</label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend data-i18n="controls.colorsLegend">配色(クリックで塗る色を選ぶ)</legend>
+        <div class="slot-strip" id="slotStrip"></div>
+        <div class="slot-detail" id="slotDetail"></div>
+        <div class="btn-row" style="margin-top:9px">
+          <button type="button" class="btn ghost" id="addSlot" data-i18n="controls.addSlot">+ 色を追加</button>
+          <button type="button" class="btn ghost" id="removeSlot" data-i18n="controls.removeSlot">選択中の色を削除</button>
+        </div>
+        <div class="cap-note" id="capNote"></div>
+        <div class="checkline" id="soloFillRow" style="margin-top:9px; display:none;">
+          <input type="checkbox" id="soloFill">
+          <label for="soloFill" data-i18n="controls.soloFill">単色をベタ塗りにする(既定は濃淡2トーン)</label>
+        </div>
+        <div class="skirt-hint" id="skirtHint"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend data-i18n="controls.tapeLegend">ロードテープ(継ぎ目)</legend>
+        <select id="tapeSelect" aria-label="ロードテープの色" data-i18n-aria="controls.tapeLegend">
+          <option value="brown" data-i18n="controls.tapeBrown">茶色(既定)</option>
+          <option value="white" data-i18n="controls.tapeWhite">白</option>
+          <option value="transparent" data-i18n="controls.tapeTransparent">透明(継ぎ目を描かない)</option>
+        </select>
+      </fieldset>
+    </section>
+  </div>
+
+  <!-- ================= 展開図(マス目) ================= -->
+  <section class="panel chart-panel" aria-label="展開図" data-i18n-aria="chart.panel">
+    <div class="chart-head">
+      <div>
+        <h2 style="margin:0 0 4px" data-i18n="chart.heading">展開図 — メーカー図面と同じ 列 × 段</h2>
+        <div class="hint" style="margin:0">
+          <span data-i18n="chart.subHint">左右の数字が段(下から1・2・3…)、上の数字が列。図面の並びに合わせています。</span>
+          <span id="paintHelp"></span>
+        </div>
+      </div>
+      <div class="chart-tools">
+        <label class="hint" style="margin:0"><span data-i18n="chart.cols">列</span>
+          <select id="gridSSelect" style="width:auto; margin-left:4px"></select>
+        </label>
+        <label class="hint" style="margin:0"><span data-i18n="chart.rows">段</span>
+          <select id="gridRSelect" style="width:auto; margin-left:4px"></select>
+        </label>
+        <button type="button" class="btn ghost" id="loadSapphire" data-i18n="chart.loadSapphire">MV-56b(サファイア)を読み込む</button>
+      </div>
+    </div>
+
+    <div class="chart-scroll">
+      <canvas id="chartCanvas" width="1200" height="560"></canvas>
+    </div>
+
+    <div class="chart-legend" id="chartLegend"></div>
+
+    <div id="paintTools" style="display:none">
+      <div class="btn-row" style="margin-top:12px">
+        <button type="button" class="btn ghost" id="fromFormula" data-i18n="chart.fromFormula">今の数式の結果をマス目に取り込む</button>
+        <button type="button" class="btn ghost" id="clearGrid" data-i18n="chart.clearGrid">全部リセット</button>
+      </div>
+    </div>
+
+    <div id="triPaintTools" style="display:none">
+      <div class="field" style="margin-top:12px">
+        <div class="field-label"><span data-i18n="chart.clickAction">クリックの動作</span></div>
+        <div class="seg" id="triToolSeg">
+          <button type="button" data-tool="paint" data-i18n="chart.triPaint">選んだ色で塗る</button>
+          <button type="button" data-tool="flip" data-i18n="chart.triFlip">対角線を反転</button>
+        </div>
+        <div class="hint" data-i18n="chart.triHint">「塗る」はクリックした側(対角線のどちらか)だけを塗ります。ドラッグでまとめて塗れます</div>
+      </div>
+      <div class="btn-row" style="margin-top:8px">
+        <button type="button" class="btn ghost" id="triFromGrid" data-i18n="chart.triFromGrid">今のマス目(1色)を三角マスに取り込む</button>
+        <button type="button" class="btn ghost" id="triClearGrid" data-i18n="chart.clearGrid">全部リセット</button>
+      </div>
+    </div>
+
+    <fieldset style="margin-top:16px">
+      <legend data-i18n="chart.refLegend">参考画像(図面・写真)</legend>
+      <div class="btn-row">
+        <input type="file" id="refFile" accept="image/*" style="max-width:280px">
+        <button type="button" class="btn ghost" id="refOpen" data-i18n="chart.refOpen" disabled>参考の窓を開く</button>
+      </div>
+      <div class="hint" data-i18n="chart.refHint">
+        読み込んだ画像は独立した窓に出ます。ドラッグで好きな位置へ動かし、右下をつまんで大きさを変えられます。
+        画像はこのページの中だけで使われ、どこにも送信されません
+      </div>
+    </fieldset>
+  </section>
+
+  <!-- ================= 書き出し ================= -->
+  <section class="panel export-panel" aria-label="書き出し" data-i18n-aria="export.panel">
+    <div>
+      <div class="label-line">
+        <h2 style="margin:0" data-i18n="export.heading">共有コード</h2>
+        <span class="pill" id="formatPill"></span>
+        <span class="hint" id="lenHint" style="margin:0"></span>
+      </div>
+      <div class="code-row">
+        <input type="text" id="codeOut" class="mono" readonly aria-label="共有コード" data-i18n-aria="export.heading">
+        <button type="button" class="btn primary" id="copyCode" data-i18n="export.copy">コピー</button>
+      </div>
+      <div class="copy-msg" id="copyMsg"></div>
+      <div class="hint" id="codeNote" style="margin-top:7px"></div>
+    </div>
+    <div>
+      <div class="label-line"><h2 style="margin:0" id="snippetTitle">実装に足す用</h2></div>
+      <pre class="snippet mono" id="snippet"></pre>
+      <button type="button" class="btn ghost" id="copySnippet" data-i18n="export.copyAlso" style="margin-top:8px">これもコピー</button>
+      <div class="copy-msg" id="copySnippetMsg"></div>
+    </div>
+  </section>
+
+  <div class="notes">
+    <h2 data-i18n="notes.heading">使い方のメモ</h2>
+    <div class="notes-grid">
+      <div class="note-card">
+        <h3 data-i18n="notes.card1Title">図面から柄を起こす手順</h3>
+        <ul>
+          <li data-i18n="notes.card1Li1">列と段を図面に合わせる(MV-56bなら24列×13段)</li>
+          <li data-i18n="notes.card1Li2">図面画像を敷いて、位置と倍率を合わせる</li>
+          <li data-i18n="notes.card1Li3">参考の窓に図面を出し、見比べながらマスをクリックして塗る</li>
+          <li data-i18n="notes.card1Li4">できたコードをコピーしてゲームのコード欄に貼る(そのまま使える)</li>
+          <li data-i18n="notes.card1Li5">みんなで使う柄にするなら「実装に足す用」をプリセットとして組み込む</li>
+        </ul>
+      </div>
+      <div class="note-card">
+        <h3 data-i18n="notes.card2Title">実機の柄は数式に載せない</h3>
+        <p data-i18n="notes.card2P1">
+          実機の柄は、写真合わせの例外(上下で位相をずらす・最下段だけベタ塗りなど)を含むことが多く、
+          数式に押し込めると見た目が崩れます。実際サファイア柄を数式で探索しても一致率は5割程度でした。
+        </p>
+        <p data-i18n-html="notes.card2P2">
+          そこで実機由来の柄は<b>マス目をそのまま書き写して</b><code>balloon-appearance.js</code>の
+          <code>PATTERNS</code>にプリセットとして持たせます(「実装に足す用」がその下書き)。
+          数式のほうは、プレイヤーが自分で適当な柄を作るための道具として残しています。
+        </p>
+      </div>
+      <div class="note-card">
+        <h3 data-i18n="notes.card3Title">マス目の柄を配る2つの道</h3>
+        <p data-i18n-html="notes.card3P1">
+          <b>その場で配る</b>: <code>H</code>で始まるコードにそのまま載ります。横の繰り返しを自動で畳むので、
+          MV-56b相当(24列×13段・4色)なら約50文字。手打ちは無理でもコピペ・URL・QRなら通ります。
+          実装を変えずに誰でも作って配れるのが利点です。
+        </p>
+        <p data-i18n-html="notes.card3P2">
+          <b>プリセットにする</b>: 実装の<code>PATTERNS</code>へ組み込むと、コードは番号1つ(数文字)で済みます。
+          みんなが使う実機の柄はこちら。反映にはデプロイが要ります。
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <footer data-i18n="footer">気球パターン・エディタ — prototype/mobile の balloon-appearance.js と同じ計算式・同じ球皮形状</footer>
+</div>
+
+<div id="refWindow" aria-label="参考画像" data-i18n-aria="chart.refLegend">
+  <div class="refwin-bar" id="refWinBar">
+    <span class="refwin-title" id="refWinTitle">参考画像</span>
+    <button type="button" id="refZoomOut" aria-label="縮小" data-i18n-aria="ref.zoomOut">−</button>
+    <button type="button" id="refZoomVal">100%</button>
+    <button type="button" id="refZoomIn" aria-label="拡大" data-i18n-aria="ref.zoomIn">＋</button>
+    <button type="button" id="refWinClose" aria-label="閉じる" data-i18n-aria="ref.close">✕</button>
+  </div>
+  <div class="refwin-body" id="refWinBody">
+    <div class="refwin-empty" id="refWinEmpty" data-i18n="ref.empty">画像を読み込むとここに表示されます</div>
+  </div>
+</div>
+
+<script type="module">
+// ゲーム本体のロジックをそのまま使う(再実装しない)。パターン計算・共有コードの
+// 符号化/復号はballoon-appearance.js、色パレットはnet.jsが唯一の正とし、
+// ここでは持たない。ゲーム側の仕様が変わっても(v0→v4の実績あり)このツールは
+// 自動的に追従する
+import { BALLOON_COLORS } from '../../prototype/net.js';
+import {
+  GORES, ENV_Y_SCALE, PATTERN_IDS, PATTERNS, CUSTOM_PATTERN,
+  KERNEL_SLICES, KERNEL_WAVE_PERIODS, KERNEL_MAPPINGS, KERNEL_KG_VALUES, KERNEL_KV_MAX,
+  DEFAULT_KERNEL, MAX_COLORS, TAPE_COLORS, GRID_PATTERN, TRI_GRID_PATTERN,
+  MAX_CODE_LENGTH, encodeAppearance, colorSlotAt, resolvePattern,
+} from '../../prototype/balloon-appearance.js';
+
+(function () {
+  'use strict';
+
+  // UI表示用の色名(言語ごと)。並びはnet.jsのBALLOON_COLORSと同じ順(色そのものの
+  // データは持たず、i18nキーだけをここで対応させる)
+  var COLOR_KEYS = [
+    'red', 'blue', 'green', 'yellow', 'purple', 'orange', 'cyan', 'pink',
+    'white', 'black', 'yellowGreen', 'brown', 'indigo', 'amber', 'lavender', 'mint',
+  ];
+  function colorLabel(i) {
+    var key = COLOR_KEYS[i];
+    return key ? t('color.' + key) : '';
+  }
+
+  /* =======================================================================
+   * 多言語対応(i18n)。ゲーム本体(i18n.js)と同じ7言語(ja/en/pt/pl/fr/de/es)。
+   * キーはフラットな文字列(例 'save.undo')。各キーの値は{ja:…, en:…, …}の
+   * オブジェクトで、選択言語に無ければjaへ、jaにも無ければキー自体へ落ちる。
+   * balloon-appearance.js へ貼り付ける下書きコード(gridSnippet/triGridSnippet
+   * 内のコメント)はこの辞書を通さず常に日本語のまま出す。貼り付け先の
+   * balloon-appearance.js 自体が日本語コメントで統一されているため
+   * ======================================================================= */
+  var LANGS = [
+    { code: 'ja', label: '日本語' },
+    { code: 'en', label: 'English' },
+    { code: 'pt', label: 'Português' },
+    { code: 'pl', label: 'Polski' },
+    { code: 'fr', label: 'Français' },
+    { code: 'de', label: 'Deutsch' },
+    { code: 'es', label: 'Español' },
+  ];
+
+  var I18N = {
+    'title': { ja: '気球パターン・エディタ', en: 'Balloon Pattern Editor', pt: 'Editor de Padrões do Balão', pl: 'Edytor wzorów balonu', fr: 'Éditeur de motifs de montgolfière', de: 'Ballonmuster-Editor', es: 'Editor de patrones del globo' },
+    'lede': {
+      ja: 'ゲーム本体(<code>balloon-appearance.js</code>)と同じ計算式・同じ形状で描いています。左は実機と同じ楕円体の球皮をドラッグで回せる3Dプレビュー、下はメーカー図面と同じ「列×段」のマス目。図面を別の窓に出して見比べながらマスを塗れば、実機の柄をそのまま書き写せます。',
+      en: 'Rendered with the same formulas and shape as the game itself (<code>balloon-appearance.js</code>). On the left, a 3D preview of the same ellipsoid envelope you can drag to rotate; below, a "column × row" grid matching the manufacturer\'s diagram. Open the reference diagram in its own window and paint the grid to copy a real balloon\'s pattern exactly.',
+      pt: 'Desenhado com as mesmas fórmulas e forma do jogo (<code>balloon-appearance.js</code>). À esquerda, uma prévia 3D do mesmo balão elipsoidal que você pode girar arrastando; abaixo, uma grade de "colunas × linhas" igual ao desenho do fabricante. Abra a imagem de referência em janela separada e pinte a grade para copiar o padrão real.',
+      pl: 'Rysowane tymi samymi wzorami i kształtem co sama gra (<code>balloon-appearance.js</code>). Po lewej podgląd 3D tej samej elipsoidalnej powłoki, którą można obracać przeciąganiem; poniżej siatka „kolumny × wiersze" taka sama jak na rysunku producenta. Otwórz obraz referencyjny w osobnym oknie i maluj siatkę, aby dokładnie odwzorować rzeczywisty wzór.',
+      fr: 'Dessiné avec les mêmes formules et la même forme que le jeu (<code>balloon-appearance.js</code>). À gauche, un aperçu 3D de la même enveloppe ellipsoïdale que vous pouvez faire pivoter; en dessous, une grille « colonnes × rangées » identique au plan du fabricant. Ouvrez l\'image de référence dans une fenêtre séparée et peignez la grille pour reproduire fidèlement un motif réel.',
+      de: 'Gezeichnet mit denselben Formeln und derselben Form wie das Spiel selbst (<code>balloon-appearance.js</code>). Links eine 3D-Vorschau derselben ellipsoiden Hülle, die per Ziehen gedreht werden kann; unten ein „Spalten × Reihen"-Raster wie im Herstellerplan. Öffnen Sie das Referenzbild in einem eigenen Fenster und malen Sie das Raster, um ein echtes Muster originalgetreu zu übertragen.',
+      es: 'Dibujado con las mismas fórmulas y forma que el propio juego (<code>balloon-appearance.js</code>). A la izquierda, una vista previa 3D del mismo globo elipsoidal que puedes girar arrastrando; abajo, una cuadrícula de "columnas × filas" igual al plano del fabricante. Abre la imagen de referencia en una ventana aparte y pinta la cuadrícula para copiar tal cual un patrón real.',
+    },
+    'save.panel': { ja: '作業の保存・読み込み', en: 'Save & load your work', pt: 'Salvar e carregar seu trabalho', pl: 'Zapisywanie i wczytywanie pracy', fr: 'Enregistrer et charger votre travail', de: 'Arbeit speichern und laden', es: 'Guardar y cargar tu trabajo' },
+    'save.undo': { ja: '↶ 元に戻す', en: '↶ Undo', pt: '↶ Desfazer', pl: '↶ Cofnij', fr: '↶ Annuler', de: '↶ Rückgängig', es: '↶ Deshacer' },
+    'save.undoTitle': { ja: '元に戻す (Ctrl+Z)', en: 'Undo (Ctrl+Z)', pt: 'Desfazer (Ctrl+Z)', pl: 'Cofnij (Ctrl+Z)', fr: 'Annuler (Ctrl+Z)', de: 'Rückgängig (Strg+Z)', es: 'Deshacer (Ctrl+Z)' },
+    'save.redo': { ja: '↷ やり直す', en: '↷ Redo', pt: '↷ Refazer', pl: '↷ Ponów', fr: '↷ Rétablir', de: '↷ Wiederholen', es: '↷ Rehacer' },
+    'save.redoTitle': { ja: 'やり直す (Ctrl+Shift+Z)', en: 'Redo (Ctrl+Shift+Z)', pt: 'Refazer (Ctrl+Shift+Z)', pl: 'Ponów (Ctrl+Shift+Z)', fr: 'Rétablir (Ctrl+Maj+Z)', de: 'Wiederholen (Strg+Umschalt+Z)', es: 'Rehacer (Ctrl+Mayús+Z)' },
+    'save.namePlaceholder': { ja: '作品名', en: 'Name', pt: 'Nome', pl: 'Nazwa', fr: 'Nom', de: 'Name', es: 'Nombre' },
+    'save.saveNamed': { ja: '名前を付けて保存', en: 'Save as…', pt: 'Salvar como…', pl: 'Zapisz jako…', fr: 'Enregistrer sous…', de: 'Speichern unter…', es: 'Guardar como…' },
+    'save.savedListEmpty': { ja: '保存した作品…', en: 'Saved works…', pt: 'Trabalhos salvos…', pl: 'Zapisane prace…', fr: 'Travaux enregistrés…', de: 'Gespeicherte Arbeiten…', es: 'Trabajos guardados…' },
+    'save.savedListLabel': { ja: '保存した作品({n})…', en: 'Saved works ({n})…', pt: 'Trabalhos salvos ({n})…', pl: 'Zapisane prace ({n})…', fr: 'Travaux enregistrés ({n})…', de: 'Gespeicherte Arbeiten ({n})…', es: 'Trabajos guardados ({n})…' },
+    'save.load': { ja: '読み込む', en: 'Load', pt: 'Carregar', pl: 'Wczytaj', fr: 'Charger', de: 'Laden', es: 'Cargar' },
+    'save.delete': { ja: '削除', en: 'Delete', pt: 'Excluir', pl: 'Usuń', fr: 'Supprimer', de: 'Löschen', es: 'Eliminar' },
+    'save.exportFile': { ja: 'ファイルに書き出す', en: 'Export to file', pt: 'Exportar para arquivo', pl: 'Eksportuj do pliku', fr: 'Exporter vers un fichier', de: 'In Datei exportieren', es: 'Exportar a archivo' },
+    'save.importFile': { ja: 'ファイルから読み込む', en: 'Import from file', pt: 'Importar de arquivo', pl: 'Importuj z pliku', fr: 'Importer depuis un fichier', de: 'Aus Datei importieren', es: 'Importar desde archivo' },
+    'save.kbdHint': {
+      ja: 'キーボード: <b>↑↓</b>で色スロットを切り替え / <b>←→</b>で選んだスロットの色を変える / <b>Ctrl+Z</b>(<b>⌘+Z</b>)で元に戻す / <b>Ctrl+Shift+Z</b>でやり直す',
+      en: 'Keyboard: <b>↑↓</b> switch color slot / <b>←→</b> change the selected slot\'s color / <b>Ctrl+Z</b> (<b>⌘+Z</b>) undo / <b>Ctrl+Shift+Z</b> redo',
+      pt: 'Teclado: <b>↑↓</b> troca o slot de cor / <b>←→</b> muda a cor do slot selecionado / <b>Ctrl+Z</b> (<b>⌘+Z</b>) desfazer / <b>Ctrl+Shift+Z</b> refazer',
+      pl: 'Klawiatura: <b>↑↓</b> zmienia slot koloru / <b>←→</b> zmienia kolor wybranego slotu / <b>Ctrl+Z</b> (<b>⌘+Z</b>) cofnij / <b>Ctrl+Shift+Z</b> ponów',
+      fr: 'Clavier : <b>↑↓</b> change l\'emplacement de couleur / <b>←→</b> change la couleur de l\'emplacement sélectionné / <b>Ctrl+Z</b> (<b>⌘+Z</b>) annuler / <b>Ctrl+Maj+Z</b> rétablir',
+      de: 'Tastatur: <b>↑↓</b> Farbfeld wechseln / <b>←→</b> Farbe des gewählten Felds ändern / <b>Strg+Z</b> (<b>⌘+Z</b>) rückgängig / <b>Strg+Umschalt+Z</b> wiederholen',
+      es: 'Teclado: <b>↑↓</b> cambia la ranura de color / <b>←→</b> cambia el color de la ranura seleccionada / <b>Ctrl+Z</b> (<b>⌘+Z</b>) deshacer / <b>Ctrl+Mayús+Z</b> rehacer',
+    },
+    'preview.panel': { ja: '3Dプレビュー', en: '3D preview', pt: 'Pré-visualização 3D', pl: 'Podgląd 3D', fr: 'Aperçu 3D', de: '3D-Vorschau', es: 'Vista previa 3D' },
+    'preview.heading': { ja: '3Dプレビュー', en: '3D preview', pt: 'Pré-visualização 3D', pl: 'Podgląd 3D', fr: 'Aperçu 3D', de: '3D-Vorschau', es: 'Vista previa 3D' },
+    'preview.noWebgl': { ja: 'この環境ではWebGLが使えないため、3Dプレビューを表示できません。下のマス目と数式の編集はそのまま使えます。', en: 'WebGL is unavailable in this environment, so the 3D preview can\'t be shown. The grid and formula editing below still work.', pt: 'O WebGL não está disponível neste ambiente, então a prévia 3D não pode ser exibida. A grade e a edição por fórmula abaixo continuam funcionando.', pl: 'WebGL jest niedostępny w tym środowisku, więc podgląd 3D nie może zostać wyświetlony. Siatka i edycja wzoru poniżej nadal działają.', fr: 'WebGL n\'est pas disponible dans cet environnement, l\'aperçu 3D ne peut donc pas s\'afficher. La grille et l\'édition par formule ci-dessous fonctionnent toujours.', de: 'WebGL ist in dieser Umgebung nicht verfügbar, daher kann die 3D-Vorschau nicht angezeigt werden. Das Raster und die Formel-Bearbeitung unten funktionieren weiterhin.', es: 'WebGL no está disponible en este entorno, por lo que no se puede mostrar la vista previa 3D. La cuadrícula y la edición por fórmula de abajo siguen funcionando.' },
+    'preview.initError': { ja: '3Dプレビューを初期化できませんでした: {msg}', en: 'Could not initialize the 3D preview: {msg}', pt: 'Não foi possível inicializar a prévia 3D: {msg}', pl: 'Nie udało się zainicjować podglądu 3D: {msg}', fr: 'Impossible d\'initialiser l\'aperçu 3D : {msg}', de: 'Die 3D-Vorschau konnte nicht initialisiert werden: {msg}', es: 'No se pudo inicializar la vista previa 3D: {msg}' },
+    'preview.hint': { ja: 'ドラッグで回転 / ホイールで拡大', en: 'Drag to rotate / scroll to zoom', pt: 'Arraste para girar / role para ampliar', pl: 'Przeciągnij, aby obrócić / kółko myszy, aby przybliżyć', fr: 'Glisser pour pivoter / molette pour zoomer', de: 'Ziehen zum Drehen / Scrollen zum Zoomen', es: 'Arrastra para girar / rueda para acercar' },
+    'preview.auto': { ja: '自動回転', en: 'Auto-rotate', pt: 'Girar automático', pl: 'Autoobrót', fr: 'Rotation auto', de: 'Auto-Drehung', es: 'Rotación automática' },
+    'preview.reset': { ja: '視点リセット', en: 'Reset view', pt: 'Redefinir vista', pl: 'Resetuj widok', fr: 'Réinitialiser la vue', de: 'Ansicht zurücksetzen', es: 'Restablecer vista' },
+    'preview.inside': { ja: '内側から見る', en: 'View from inside', pt: 'Ver de dentro', pl: 'Widok od wewnątrz', fr: 'Voir de l\'intérieur', de: 'Von innen ansehen', es: 'Ver desde dentro' },
+    'controls.panel': { ja: 'コントロール', en: 'Controls', pt: 'Controles', pl: 'Sterowanie', fr: 'Contrôles', de: 'Steuerung', es: 'Controles' },
+    'controls.heading': { ja: 'コントロール', en: 'Controls', pt: 'Controles', pl: 'Sterowanie', fr: 'Contrôles', de: 'Steuerung', es: 'Controles' },
+    'controls.modeLegend': { ja: '柄のつくり方', en: 'How to build the pattern', pt: 'Como criar o padrão', pl: 'Sposób tworzenia wzoru', fr: 'Méthode de création du motif', de: 'Musterart', es: 'Cómo crear el patrón' },
+    'controls.modeFormula': { ja: '数式でつくる', en: 'Build with formula', pt: 'Criar por fórmula', pl: 'Twórz wzorem', fr: 'Créer avec une formule', de: 'Mit Formel erstellen', es: 'Crear con fórmula' },
+    'controls.modePaint': { ja: 'マス目を直接塗る', en: 'Paint the grid directly', pt: 'Pintar a grade diretamente', pl: 'Maluj siatkę bezpośrednio', fr: 'Peindre la grille directement', de: 'Raster direkt bemalen', es: 'Pintar la cuadrícula directamente' },
+    'controls.modeTriPaint': { ja: 'マスを三角パネルで塗る', en: 'Paint cells as triangle panels', pt: 'Pintar células como painéis triangulares', pl: 'Maluj komórki jako trójkątne panele', fr: 'Peindre les cellules en panneaux triangulaires', de: 'Zellen als Dreieckspaneele bemalen', es: 'Pintar celdas como paneles triangulares' },
+    'controls.presetLegend': { ja: '下敷きにする柄', en: 'Starting pattern', pt: 'Padrão de base', pl: 'Wzór wyjściowy', fr: 'Motif de base', de: 'Ausgangsmuster', es: 'Patrón de partida' },
+    'controls.kernelLegend': { ja: '数式のパラメータ', en: 'Formula parameters', pt: 'Parâmetros da fórmula', pl: 'Parametry wzoru', fr: 'Paramètres de la formule', de: 'Formel-Parameter', es: 'Parámetros de la fórmula' },
+    'controls.kv': { ja: '縦の段数 Kv', en: 'Row count Kv', pt: 'Nº de linhas Kv', pl: 'Liczba wierszy Kv', fr: 'Nombre de rangées Kv', de: 'Reihenanzahl Kv', es: 'Nº de filas Kv' },
+    'controls.kvNumAria': { ja: '縦の段数の数値', en: 'Row count value', pt: 'Valor do número de linhas', pl: 'Wartość liczby wierszy', fr: 'Valeur du nombre de rangées', de: 'Wert der Reihenanzahl', es: 'Valor del número de filas' },
+    'controls.kvHint': { ja: '頂点からスカートまでに色が何段進むか', en: 'How many rows the color advances from the crown to the skirt', pt: 'Quantas linhas a cor avança do topo até a saia', pl: 'Ile wierszy kolor przechodzi od szczytu do spódnicy', fr: 'Sur combien de rangées la couleur avance du sommet à la jupe', de: 'Wie viele Reihen die Farbe von der Spitze bis zum Rocksaum fortschreitet', es: 'Cuántas filas avanza el color desde la cima hasta la falda' },
+    'controls.kg': { ja: '傾き Kg(一周で進む段数)', en: 'Slant Kg (rows advanced per revolution)', pt: 'Inclinação Kg (linhas por volta)', pl: 'Nachylenie Kg (wiersze na obrót)', fr: 'Inclinaison Kg (rangées par tour)', de: 'Neigung Kg (Reihen pro Umdrehung)', es: 'Inclinación Kg (filas por vuelta)' },
+    'controls.kgHint': { ja: '符号が巻き方向。「N」は色数が変わっても一周でちょうど1巡する特殊値', en: 'The sign sets the wind direction. "N" is a special value that always completes exactly one lap per revolution, whatever the color count.', pt: 'O sinal define o sentido do enrolamento. "N" é um valor especial que sempre completa exatamente uma volta por revolução, seja qual for o nº de cores.', pl: 'Znak określa kierunek nawinięcia. „N" to specjalna wartość, która zawsze wykonuje dokładnie jeden pełny obieg na obrót, niezależnie od liczby kolorów.', fr: 'Le signe indique le sens d\'enroulement. « N » est une valeur spéciale qui fait toujours exactement un tour complet par révolution, quel que soit le nombre de couleurs.', de: 'Das Vorzeichen bestimmt die Wickelrichtung. „N" ist ein Sonderwert, der unabhängig von der Farbanzahl pro Umdrehung stets genau eine Runde vollendet.', es: 'El signo indica el sentido del enrollado. "N" es un valor especial que siempre completa exactamente una vuelta por revolución, sea cual sea el número de colores.' },
+    'controls.mapping': { ja: '色の並べ方', en: 'Color arrangement', pt: 'Disposição das cores', pl: 'Układ kolorów', fr: 'Disposition des couleurs', de: 'Farbanordnung', es: 'Disposición de colores' },
+    'controls.waveN': { ja: '波の数', en: 'Wave count', pt: 'Nº de ondas', pl: 'Liczba fal', fr: 'Nombre d\'ondulations', de: 'Wellenzahl', es: 'Número de ondas' },
+    'controls.waveA': { ja: '波の高さ', en: 'Wave height', pt: 'Altura da onda', pl: 'Wysokość fali', fr: 'Hauteur d\'ondulation', de: 'Wellenhöhe', es: 'Altura de onda' },
+    'controls.checker': { ja: '隣り合うマスを市松(互い違い)にする', en: 'Checker adjacent cells', pt: 'Alternar células adjacentes (xadrez)', pl: 'Szachownica sąsiednich komórek', fr: 'Alterner les cellules adjacentes (damier)', de: 'Benachbarte Zellen im Schachbrettmuster', es: 'Alternar celdas adyacentes (a cuadros)' },
+    'controls.colorsLegend': { ja: '配色(クリックで塗る色を選ぶ)', en: 'Colors (click to pick the paint color)', pt: 'Cores (clique para escolher a cor de pintura)', pl: 'Kolory (kliknij, aby wybrać kolor malowania)', fr: 'Couleurs (cliquez pour choisir la couleur de peinture)', de: 'Farben (klicken, um die Malfarbe zu wählen)', es: 'Colores (haz clic para elegir el color de pintura)' },
+    'controls.addSlot': { ja: '+ 色を追加', en: '+ Add color', pt: '+ Adicionar cor', pl: '+ Dodaj kolor', fr: '+ Ajouter une couleur', de: '+ Farbe hinzufügen', es: '+ Añadir color' },
+    'controls.removeSlot': { ja: '選択中の色を削除', en: 'Remove selected color', pt: 'Remover cor selecionada', pl: 'Usuń wybrany kolor', fr: 'Supprimer la couleur sélectionnée', de: 'Ausgewählte Farbe entfernen', es: 'Eliminar color seleccionado' },
+    'controls.soloFill': { ja: '単色をベタ塗りにする(既定は濃淡2トーン)', en: 'Fill a single color flat (default is a light/dark two-tone)', pt: 'Preencher cor única de forma sólida (padrão é bitom claro/escuro)', pl: 'Wypełnij jeden kolor jednolicie (domyślnie dwa odcienie)', fr: 'Remplir une seule couleur de façon unie (par défaut, un dégradé clair/foncé)', de: 'Einzelfarbe flächig füllen (Standard ist ein Hell/Dunkel-Zweiton)', es: 'Rellenar un solo color de forma plana (por defecto, dos tonos claro/oscuro)' },
+    'controls.tapeLegend': { ja: 'ロードテープ(継ぎ目)', en: 'Load tape (seams)', pt: 'Fita de carga (costuras)', pl: 'Taśma nośna (szwy)', fr: 'Bande de charge (coutures)', de: 'Lastband (Nähte)', es: 'Cinta de carga (costuras)' },
+    'controls.tapeBrown': { ja: '茶色(既定)', en: 'Brown (default)', pt: 'Marrom (padrão)', pl: 'Brązowy (domyślny)', fr: 'Marron (par défaut)', de: 'Braun (Standard)', es: 'Marrón (predeterminado)' },
+    'controls.tapeWhite': { ja: '白', en: 'White', pt: 'Branco', pl: 'Biały', fr: 'Blanc', de: 'Weiß', es: 'Blanco' },
+    'controls.tapeTransparent': { ja: '透明(継ぎ目を描かない)', en: 'Transparent (no seam drawn)', pt: 'Transparente (sem costura desenhada)', pl: 'Przezroczysty (bez rysowania szwu)', fr: 'Transparent (aucune couture dessinée)', de: 'Transparent (keine Naht gezeichnet)', es: 'Transparente (sin costura dibujada)' },
+    'chart.panel': { ja: '展開図', en: 'Panel layout', pt: 'Layout dos painéis', pl: 'Rozwinięcie', fr: 'Développé du patron', de: 'Abwicklung', es: 'Despliegue del patrón' },
+    'chart.heading': { ja: '展開図 — メーカー図面と同じ 列 × 段', en: 'Panel layout — same column × row grid as the manufacturer\'s diagram', pt: 'Layout dos painéis — mesma grade de colunas × linhas do desenho do fabricante', pl: 'Rozwinięcie — ta sama siatka kolumn × wierszy co na rysunku producenta', fr: 'Développé du patron — même grille colonnes × rangées que le plan du fabricant', de: 'Abwicklung — dasselbe Spalten × Reihen-Raster wie im Herstellerplan', es: 'Despliegue del patrón — misma cuadrícula de columnas × filas que el plano del fabricante' },
+    'chart.subHint': { ja: '左右の数字が段(下から1・2・3…)、上の数字が列。図面の並びに合わせています。', en: 'The numbers on the sides are rows (1, 2, 3… from the bottom); the numbers on top are columns — matching the diagram\'s layout.', pt: 'Os números nas laterais são as linhas (1, 2, 3… de baixo para cima); os de cima são as colunas — seguindo o layout do desenho.', pl: 'Liczby po bokach to wiersze (1, 2, 3… od dołu); liczby na górze to kolumny — zgodnie z układem rysunku.', fr: 'Les nombres sur les côtés sont les rangées (1, 2, 3… depuis le bas); ceux du haut sont les colonnes — conformément au plan.', de: 'Die Zahlen an den Seiten sind Reihen (1, 2, 3… von unten); die Zahlen oben sind Spalten — passend zur Anordnung im Plan.', es: 'Los números a los lados son filas (1, 2, 3… desde abajo); los de arriba son columnas, siguiendo el diseño del plano.' },
+    'chart.cols': { ja: '列', en: 'Cols', pt: 'Colunas', pl: 'Kolumny', fr: 'Colonnes', de: 'Spalten', es: 'Columnas' },
+    'chart.rows': { ja: '段', en: 'Rows', pt: 'Linhas', pl: 'Wiersze', fr: 'Rangées', de: 'Reihen', es: 'Filas' },
+    'chart.topLabel': { ja: 'Fg(頂点側)', en: 'Fg (crown side)', pt: 'Fg (lado do topo)', pl: 'Fg (strona szczytu)', fr: 'Fg (côté sommet)', de: 'Fg (Spitzenseite)', es: 'Fg (lado de la cima)' },
+    'chart.bottomLabel': { ja: 'Nx(スカート側)', en: 'Nx (skirt side)', pt: 'Nx (lado da saia)', pl: 'Nx (strona spódnicy)', fr: 'Nx (côté jupe)', de: 'Nx (Rockseite)', es: 'Nx (lado de la falda)' },
+    'chart.legendItem': { ja: '色{n} {name}', en: 'Color {n} {name}', pt: 'Cor {n} {name}', pl: 'Kolor {n} {name}', fr: 'Couleur {n} {name}', de: 'Farbe {n} {name}', es: 'Color {n} {name}' },
+    'chart.loadSapphire': { ja: 'MV-56b(サファイア)を読み込む', en: 'Load MV-56b (Sapphire)', pt: 'Carregar MV-56b (Sapphire)', pl: 'Wczytaj MV-56b (Sapphire)', fr: 'Charger MV-56b (Sapphire)', de: 'MV-56b (Sapphire) laden', es: 'Cargar MV-56b (Sapphire)' },
+    'chart.fromFormula': { ja: '今の数式の結果をマス目に取り込む', en: 'Bake the current formula into the grid', pt: 'Aplicar o resultado da fórmula na grade', pl: 'Wypal bieżący wzór do siatki', fr: 'Appliquer le résultat de la formule à la grille', de: 'Aktuelle Formel ins Raster übernehmen', es: 'Aplicar el resultado de la fórmula a la cuadrícula' },
+    'chart.clearGrid': { ja: '全部リセット', en: 'Reset all', pt: 'Redefinir tudo', pl: 'Resetuj wszystko', fr: 'Tout réinitialiser', de: 'Alles zurücksetzen', es: 'Restablecer todo' },
+    'chart.clickAction': { ja: 'クリックの動作', en: 'Click action', pt: 'Ação do clique', pl: 'Działanie kliknięcia', fr: 'Action du clic', de: 'Klick-Aktion', es: 'Acción del clic' },
+    'chart.triPaint': { ja: '選んだ色で塗る', en: 'Paint with selected color', pt: 'Pintar com a cor selecionada', pl: 'Maluj wybranym kolorem', fr: 'Peindre avec la couleur sélectionnée', de: 'Mit gewählter Farbe malen', es: 'Pintar con el color seleccionado' },
+    'chart.triFlip': { ja: '対角線を反転', en: 'Flip diagonal', pt: 'Inverter diagonal', pl: 'Odwróć przekątną', fr: 'Inverser la diagonale', de: 'Diagonale umkehren', es: 'Invertir diagonal' },
+    'chart.triHint': { ja: '「塗る」はクリックした側(対角線のどちらか)だけを塗ります。ドラッグでまとめて塗れます', en: '"Paint" fills only the side you clicked (whichever half of the diagonal). Drag to paint several cells at once.', pt: '"Pintar" preenche apenas o lado clicado (metade da diagonal). Arraste para pintar várias células de uma vez.', pl: '„Maluj" wypełnia tylko stronę, którą kliknięto (połowę po przekątnej). Przeciągnij, aby pomalować kilka komórek naraz.', fr: '« Peindre » remplit uniquement le côté cliqué (l\'une des deux moitiés de la diagonale). Faites glisser pour peindre plusieurs cellules à la fois.', de: '„Malen" füllt nur die angeklickte Seite (eine Hälfte der Diagonale). Ziehen, um mehrere Zellen auf einmal zu bemalen.', es: '"Pintar" rellena solo el lado en el que hiciste clic (una mitad de la diagonal). Arrastra para pintar varias celdas a la vez.' },
+    'chart.triFromGrid': { ja: '今のマス目(1色)を三角マスに取り込む', en: 'Bring the current (single-color) grid into the triangle grid', pt: 'Trazer a grade atual (cor única) para a grade triangular', pl: 'Przenieś bieżącą (jednokolorową) siatkę do siatki trójkątnej', fr: 'Reprendre la grille actuelle (une couleur) dans la grille triangulaire', de: 'Aktuelles (einfarbiges) Raster ins Dreiecksraster übernehmen', es: 'Traer la cuadrícula actual (un solo color) a la cuadrícula triangular' },
+    'chart.refLegend': { ja: '参考画像(図面・写真)', en: 'Reference image (diagram / photo)', pt: 'Imagem de referência (desenho / foto)', pl: 'Obraz referencyjny (rysunek / zdjęcie)', fr: 'Image de référence (plan / photo)', de: 'Referenzbild (Plan / Foto)', es: 'Imagen de referencia (plano / foto)' },
+    'chart.refOpen': { ja: '参考の窓を開く', en: 'Open reference window', pt: 'Abrir janela de referência', pl: 'Otwórz okno referencyjne', fr: 'Ouvrir la fenêtre de référence', de: 'Referenzfenster öffnen', es: 'Abrir ventana de referencia' },
+    'chart.refHint': { ja: '読み込んだ画像は独立した窓に出ます。ドラッグで好きな位置へ動かし、右下をつまんで大きさを変えられます。画像はこのページの中だけで使われ、どこにも送信されません', en: 'The loaded image opens in its own window. Drag it anywhere and resize it by dragging the bottom-right corner. The image is only used on this page and is never sent anywhere.', pt: 'A imagem carregada abre em janela própria. Arraste-a para qualquer lugar e redimensione puxando o canto inferior direito. A imagem é usada apenas nesta página e nunca é enviada a lugar nenhum.', pl: 'Wczytany obraz otwiera się w osobnym oknie. Możesz go przeciągnąć w dowolne miejsce i zmienić rozmiar, ciągnąc za prawy dolny róg. Obraz jest używany tylko na tej stronie i nigdy nie jest nigdzie wysyłany.', fr: 'L\'image chargée s\'ouvre dans sa propre fenêtre. Faites-la glisser où vous voulez et redimensionnez-la en tirant le coin inférieur droit. L\'image n\'est utilisée que sur cette page et n\'est jamais envoyée où que ce soit.', de: 'Das geladene Bild öffnet sich in einem eigenen Fenster. Ziehen Sie es an eine beliebige Stelle und ändern Sie die Größe, indem Sie die untere rechte Ecke ziehen. Das Bild wird nur auf dieser Seite verwendet und niemals irgendwohin gesendet.', es: 'La imagen cargada se abre en su propia ventana. Arrástrala a cualquier lugar y cambia su tamaño tirando de la esquina inferior derecha. La imagen solo se usa en esta página y nunca se envía a ningún sitio.' },
+    'ref.zoomOut': { ja: '縮小', en: 'Zoom out', pt: 'Reduzir', pl: 'Pomniejsz', fr: 'Réduire', de: 'Verkleinern', es: 'Alejar' },
+    'ref.zoomIn': { ja: '拡大', en: 'Zoom in', pt: 'Ampliar', pl: 'Powiększ', fr: 'Agrandir', de: 'Vergrößern', es: 'Acercar' },
+    'ref.close': { ja: '閉じる', en: 'Close', pt: 'Fechar', pl: 'Zamknij', fr: 'Fermer', de: 'Schließen', es: 'Cerrar' },
+    'ref.empty': { ja: '画像を読み込むとここに表示されます', en: 'The loaded image will appear here', pt: 'A imagem carregada aparecerá aqui', pl: 'Wczytany obraz pojawi się tutaj', fr: 'L\'image chargée apparaîtra ici', de: 'Das geladene Bild wird hier angezeigt', es: 'La imagen cargada aparecerá aquí' },
+    'ref.openBtn': { ja: '参考の窓を開く', en: 'Open reference window', pt: 'Abrir janela de referência', pl: 'Otwórz okno referencyjne', fr: 'Ouvrir la fenêtre de référence', de: 'Referenzfenster öffnen', es: 'Abrir ventana de referencia' },
+    'ref.closeBtn': { ja: '参考の窓を閉じる', en: 'Close reference window', pt: 'Fechar janela de referência', pl: 'Zamknij okno referencyjne', fr: 'Fermer la fenêtre de référence', de: 'Referenzfenster schließen', es: 'Cerrar ventana de referencia' },
+    'export.panel': { ja: '書き出し', en: 'Export', pt: 'Exportar', pl: 'Eksport', fr: 'Exporter', de: 'Export', es: 'Exportar' },
+    'export.heading': { ja: '共有コード', en: 'Share code', pt: 'Código de compartilhamento', pl: 'Kod do udostępnienia', fr: 'Code de partage', de: 'Freigabe-Code', es: 'Código para compartir' },
+    'export.copy': { ja: 'コピー', en: 'Copy', pt: 'Copiar', pl: 'Kopiuj', fr: 'Copier', de: 'Kopieren', es: 'Copiar' },
+    'export.copyAlso': { ja: 'これもコピー', en: 'Copy this too', pt: 'Copiar isto também', pl: 'Skopiuj też to', fr: 'Copier aussi ceci', de: 'Dies auch kopieren', es: 'Copiar esto también' },
+    'notes.heading': { ja: '使い方のメモ', en: 'Usage notes', pt: 'Notas de uso', pl: 'Wskazówki użytkowania', fr: 'Notes d\'utilisation', de: 'Hinweise zur Nutzung', es: 'Notas de uso' },
+    'notes.card1Title': { ja: '図面から柄を起こす手順', en: 'Steps to recreate a pattern from a diagram', pt: 'Passos para recriar um padrão a partir do desenho', pl: 'Kroki odwzorowania wzoru z rysunku', fr: 'Étapes pour recréer un motif à partir d\'un plan', de: 'Schritte, um ein Muster aus einem Plan nachzubauen', es: 'Pasos para recrear un patrón a partir del plano' },
+    'notes.card1Li1': { ja: '列と段を図面に合わせる(MV-56bなら24列×13段)', en: 'Match the columns/rows to the diagram (24×13 for the MV-56b)', pt: 'Ajuste colunas e linhas ao desenho (24×13 para o MV-56b)', pl: 'Dopasuj kolumny i wiersze do rysunku (24×13 dla MV-56b)', fr: 'Faites correspondre colonnes/rangées au plan (24×13 pour le MV-56b)', de: 'Spalten/Reihen an den Plan anpassen (24×13 beim MV-56b)', es: 'Ajusta columnas y filas al plano (24×13 para el MV-56b)' },
+    'notes.card1Li2': { ja: '図面画像を敷いて、位置と倍率を合わせる', en: 'Lay the diagram image underneath and align its position and scale', pt: 'Coloque a imagem do desenho por baixo e ajuste posição e escala', pl: 'Podłóż obraz rysunku i dopasuj jego pozycję i skalę', fr: 'Placez l\'image du plan en dessous et ajustez sa position et son échelle', de: 'Das Planbild unterlegen und Position sowie Maßstab abgleichen', es: 'Coloca la imagen del plano debajo y ajusta su posición y escala' },
+    'notes.card1Li3': { ja: '参考の窓に図面を出し、見比べながらマスをクリックして塗る', en: 'Open the diagram in the reference window and click cells while comparing', pt: 'Abra o desenho na janela de referência e clique nas células comparando', pl: 'Otwórz rysunek w oknie referencyjnym i maluj komórki, porównując', fr: 'Ouvrez le plan dans la fenêtre de référence et cliquez sur les cellules en comparant', de: 'Den Plan im Referenzfenster öffnen und beim Vergleichen Zellen anklicken', es: 'Abre el plano en la ventana de referencia y haz clic en las celdas comparando' },
+    'notes.card1Li4': { ja: 'できたコードをコピーしてゲームのコード欄に貼る(そのまま使える)', en: 'Copy the resulting code and paste it into the game\'s code field (works as-is)', pt: 'Copie o código resultante e cole no campo de código do jogo (funciona diretamente)', pl: 'Skopiuj wynikowy kod i wklej go w pole kodu w grze (działa od razu)', fr: 'Copiez le code obtenu et collez-le dans le champ de code du jeu (fonctionne tel quel)', de: 'Den entstandenen Code kopieren und ins Code-Feld des Spiels einfügen (funktioniert direkt)', es: 'Copia el código resultante y pégalo en el campo de código del juego (funciona tal cual)' },
+    'notes.card1Li5': { ja: 'みんなで使う柄にするなら「実装に足す用」をプリセットとして組み込む', en: 'To share it as a preset everyone uses, wire the "for the codebase" snippet in as a preset', pt: 'Para virar um padrão para todos, incorpore o trecho "para o código" como predefinição', pl: 'Aby stał się wzorem dla wszystkich, wbuduj fragment „do implementacji" jako gotowy wzorzec', fr: 'Pour en faire un motif partagé, intégrez l\'extrait « à ajouter au code » comme préréglage', de: 'Um es als gemeinsames Preset zu nutzen, den „Für die Implementierung"-Ausschnitt als Preset einbauen', es: 'Para convertirlo en un patrón compartido, incorpora el fragmento "para el código" como preset' },
+    'notes.card2Title': { ja: '実機の柄は数式に載せない', en: 'Real balloon patterns aren\'t reduced to a formula', pt: 'Padrões reais não são reduzidos a uma fórmula', pl: 'Rzeczywiste wzory nie są sprowadzane do wzoru matematycznego', fr: 'Les motifs réels ne sont pas réduits à une formule', de: 'Echte Ballonmuster werden nicht auf eine Formel reduziert', es: 'Los patrones reales no se reducen a una fórmula' },
+    'notes.card2P1': { ja: '実機の柄は、写真合わせの例外(上下で位相をずらす・最下段だけベタ塗りなど)を含むことが多く、数式に押し込めると見た目が崩れます。実際サファイア柄を数式で探索しても一致率は5割程度でした。', en: 'Real balloon patterns often include exceptions matched from photos (a phase shift between top and bottom, a flat-filled bottom row, etc.), so forcing them into a formula distorts the look. Searching for a formula match on the Sapphire pattern only reached about 50% accuracy.', pt: 'Padrões reais costumam ter exceções ajustadas por fotos (deslocamento de fase entre topo e base, última linha sólida etc.), então forçá-los numa fórmula distorce o visual. Buscar uma fórmula para o padrão Sapphire só chegou a cerca de 50% de acerto.', pl: 'Rzeczywiste wzory często zawierają wyjątki dopasowane ze zdjęć (przesunięcie fazy góra/dół, jednolity najniższy wiersz itp.), więc wtłoczenie ich we wzór matematyczny zniekształca wygląd. Szukanie wzoru dla Sapphire dało tylko około 50% trafności.', fr: 'Les motifs réels comportent souvent des exceptions calées sur des photos (décalage de phase haut/bas, dernière rangée pleine, etc.), donc les forcer dans une formule déforme le rendu. La recherche d\'une formule pour le motif Sapphire n\'a atteint qu\'environ 50 % de correspondance.', de: 'Echte Ballonmuster enthalten oft von Fotos abgeleitete Ausnahmen (Phasenverschiebung oben/unten, unterste Reihe einfarbig usw.), sodass das Erzwingen in eine Formel das Aussehen verfälscht. Die Formelsuche für das Sapphire-Muster erreichte nur etwa 50 % Übereinstimmung.', es: 'Los patrones reales suelen tener excepciones ajustadas por fotos (desfase entre arriba y abajo, última fila sólida, etc.), así que forzarlos en una fórmula distorsiona el aspecto. Buscar una fórmula para el patrón Sapphire solo alcanzó un 50% de coincidencia.' },
+    'notes.card2P2': { ja: 'そこで実機由来の柄は<b>マス目をそのまま書き写して</b><code>balloon-appearance.js</code>の<code>PATTERNS</code>にプリセットとして持たせます(「実装に足す用」がその下書き)。数式のほうは、プレイヤーが自分で適当な柄を作るための道具として残しています。', en: 'So real-world patterns are instead <b>copied cell-by-cell</b> into <code>PATTERNS</code> in <code>balloon-appearance.js</code> as presets (the "for the codebase" panel is that draft). The formula tool remains available for players to design their own patterns.', pt: 'Por isso, padrões reais são <b>copiados célula a célula</b> para <code>PATTERNS</code> em <code>balloon-appearance.js</code> como predefinições (o painel "para o código" é esse rascunho). A ferramenta de fórmula continua disponível para jogadores criarem seus próprios padrões.', pl: 'Dlatego rzeczywiste wzory są <b>przepisywane komórka po komórce</b> do <code>PATTERNS</code> w <code>balloon-appearance.js</code> jako gotowe wzorce (panel „do implementacji" to ten szkic). Narzędzie wzoru matematycznego pozostaje dostępne, aby gracze mogli tworzyć własne wzory.', fr: 'Les motifs réels sont donc <b>recopiés case par case</b> dans <code>PATTERNS</code> de <code>balloon-appearance.js</code> comme préréglages (le panneau « à ajouter au code » en est le brouillon). L\'outil de formule reste disponible pour que les joueurs créent leurs propres motifs.', de: 'Daher werden reale Muster <b>Zelle für Zelle übertragen</b> in <code>PATTERNS</code> in <code>balloon-appearance.js</code> als Presets (das „Für die Implementierung"-Feld ist dieser Entwurf). Das Formel-Werkzeug bleibt verfügbar, damit Spieler eigene Muster gestalten können.', es: 'Por eso, los patrones reales se <b>copian celda por celda</b> en <code>PATTERNS</code> dentro de <code>balloon-appearance.js</code> como preajustes (el panel "para el código" es ese borrador). La herramienta de fórmula sigue disponible para que los jugadores diseñen sus propios patrones.' },
+    'notes.card3Title': { ja: 'マス目の柄を配る2つの道', en: 'Two ways to share a grid pattern', pt: 'Duas formas de compartilhar um padrão de grade', pl: 'Dwa sposoby udostępniania wzoru siatki', fr: 'Deux façons de partager un motif en grille', de: 'Zwei Wege, ein Rastermuster zu teilen', es: 'Dos formas de compartir un patrón de cuadrícula' },
+    'notes.card3P1': { ja: '<b>その場で配る</b>: <code>H</code>で始まるコードにそのまま載ります。横の繰り返しを自動で畳むので、MV-56b相当(24列×13段・4色)なら約50文字。手打ちは無理でもコピペ・URL・QRなら通ります。実装を変えずに誰でも作って配れるのが利点です。', en: '<b>Share it directly</b>: it fits as-is into a code starting with <code>H</code>. The horizontal repeat is automatically folded, so an MV-56b-equivalent pattern (24×13, 4 colors) runs about 50 characters. Too long to type by hand, but fine for copy-paste, a URL, or a QR code. The advantage is that anyone can create and share one without a code change.', pt: '<b>Compartilhar direto</b>: cabe como está num código que começa com <code>H</code>. A repetição horizontal é dobrada automaticamente, então um padrão equivalente ao MV-56b (24×13, 4 cores) fica com cerca de 50 caracteres. Longo demais para digitar, mas ótimo para copiar e colar, URL ou QR code. A vantagem é que qualquer um pode criar e compartilhar sem alterar o código.', pl: '<b>Udostępnij bezpośrednio</b>: mieści się w niezmienionej postaci w kodzie zaczynającym się od <code>H</code>. Powtórzenie poziome jest automatycznie zwijane, więc wzór odpowiadający MV-56b (24×13, 4 kolory) zajmuje ok. 50 znaków. Za długi, by wpisać ręcznie, ale wystarczy do kopiowania, URL lub kodu QR. Zaletą jest to, że każdy może stworzyć i udostępnić wzór bez zmiany kodu gry.', fr: '<b>Le partager directement</b> : il tient tel quel dans un code commençant par <code>H</code>. La répétition horizontale est automatiquement repliée, donc un motif équivalent au MV-56b (24×13, 4 couleurs) fait environ 50 caractères. Trop long à saisir à la main, mais adapté au copier-coller, à une URL ou à un QR code. L\'avantage est que n\'importe qui peut en créer et en partager sans modifier le code du jeu.', de: '<b>Direkt teilen</b>: passt unverändert in einen Code, der mit <code>H</code> beginnt. Die horizontale Wiederholung wird automatisch gefaltet, sodass ein MV-56b-äquivalentes Muster (24×13, 4 Farben) etwa 50 Zeichen umfasst. Zu lang zum Abtippen, aber gut für Copy-Paste, eine URL oder einen QR-Code. Der Vorteil: Jeder kann eines erstellen und teilen, ohne den Code zu ändern.', es: '<b>Compartirlo directamente</b>: encaja tal cual en un código que empieza por <code>H</code>. La repetición horizontal se pliega automáticamente, así que un patrón equivalente al MV-56b (24×13, 4 colores) ronda los 50 caracteres. Demasiado largo para escribirlo a mano, pero perfecto para copiar y pegar, una URL o un código QR. La ventaja es que cualquiera puede crear y compartir uno sin cambiar el código del juego.' },
+    'notes.card3P2': { ja: '<b>プリセットにする</b>: 実装の<code>PATTERNS</code>へ組み込むと、コードは番号1つ(数文字)で済みます。みんなが使う実機の柄はこちら。反映にはデプロイが要ります。', en: '<b>Make it a preset</b>: once wired into <code>PATTERNS</code> in the codebase, the code shrinks to a single short identifier. This is the path for real-world patterns everyone uses. It requires a deploy to take effect.', pt: '<b>Transformar em predefinição</b>: incorporado a <code>PATTERNS</code> no código, o código encolhe para um único identificador curto. Este é o caminho para padrões reais usados por todos. Requer um deploy para valer.', pl: '<b>Zrób z niego gotowy wzorzec</b>: po wbudowaniu w <code>PATTERNS</code> w kodzie, kod skraca się do jednego krótkiego identyfikatora. To droga dla rzeczywistych wzorów używanych przez wszystkich. Wymaga wdrożenia, aby zadziałało.', fr: '<b>En faire un préréglage</b> : une fois intégré à <code>PATTERNS</code> dans le code, le code se réduit à un seul identifiant court. C\'est la voie pour les motifs réels utilisés par tout le monde. Un déploiement est nécessaire pour qu\'il prenne effet.', de: '<b>Zum Preset machen</b>: einmal in <code>PATTERNS</code> im Code eingebaut, schrumpft der Code auf eine einzige kurze Kennung. Das ist der Weg für echte Muster, die alle nutzen. Ein Deploy ist nötig, damit es wirksam wird.', es: '<b>Convertirlo en preajuste</b>: una vez incorporado a <code>PATTERNS</code> en el código, el código se reduce a un único identificador corto. Este es el camino para los patrones reales que usa todo el mundo. Requiere un despliegue para que surta efecto.' },
+    'footer': { ja: '気球パターン・エディタ — prototype/mobile の balloon-appearance.js と同じ計算式・同じ球皮形状', en: 'Balloon Pattern Editor — same formulas & envelope shape as prototype/mobile\'s balloon-appearance.js', pt: 'Editor de Padrões do Balão — mesmas fórmulas e forma do balloon-appearance.js de prototype/mobile', pl: 'Edytor wzorów balonu — te same wzory i kształt powłoki co balloon-appearance.js w prototype/mobile', fr: 'Éditeur de motifs de montgolfière — mêmes formules et forme d\'enveloppe que balloon-appearance.js de prototype/mobile', de: 'Ballonmuster-Editor — gleiche Formeln & Hüllenform wie balloon-appearance.js von prototype/mobile', es: 'Editor de patrones del globo — mismas fórmulas y forma del globo que balloon-appearance.js de prototype/mobile' },
+  };
+
+  I18N = Object.assign(I18N, {
+    'color.red': { ja: '赤', en: 'Red', pt: 'Vermelho', pl: 'Czerwony', fr: 'Rouge', de: 'Rot', es: 'Rojo' },
+    'color.blue': { ja: '青', en: 'Blue', pt: 'Azul', pl: 'Niebieski', fr: 'Bleu', de: 'Blau', es: 'Azul' },
+    'color.green': { ja: '緑', en: 'Green', pt: 'Verde', pl: 'Zielony', fr: 'Vert', de: 'Grün', es: 'Verde' },
+    'color.yellow': { ja: '黄', en: 'Yellow', pt: 'Amarelo', pl: 'Żółty', fr: 'Jaune', de: 'Gelb', es: 'Amarillo' },
+    'color.purple': { ja: '紫', en: 'Purple', pt: 'Roxo', pl: 'Fioletowy', fr: 'Violet', de: 'Lila', es: 'Morado' },
+    'color.orange': { ja: '橙', en: 'Orange', pt: 'Laranja', pl: 'Pomarańczowy', fr: 'Orange', de: 'Orange', es: 'Naranja' },
+    'color.cyan': { ja: '水色', en: 'Light blue', pt: 'Azul claro', pl: 'Błękitny', fr: 'Bleu clair', de: 'Hellblau', es: 'Celeste' },
+    'color.pink': { ja: 'ピンク', en: 'Pink', pt: 'Rosa', pl: 'Różowy', fr: 'Rose', de: 'Pink', es: 'Rosa' },
+    'color.white': { ja: '白', en: 'White', pt: 'Branco', pl: 'Biały', fr: 'Blanc', de: 'Weiß', es: 'Blanco' },
+    'color.black': { ja: '黒', en: 'Black', pt: 'Preto', pl: 'Czarny', fr: 'Noir', de: 'Schwarz', es: 'Negro' },
+    'color.yellowGreen': { ja: '黄緑', en: 'Yellow-green', pt: 'Verde-amarelado', pl: 'Żółto-zielony', fr: 'Vert-jaune', de: 'Gelbgrün', es: 'Verde amarillento' },
+    'color.brown': { ja: '茶', en: 'Brown', pt: 'Marrom', pl: 'Brązowy', fr: 'Marron', de: 'Braun', es: 'Marrón' },
+    'color.indigo': { ja: '藍', en: 'Indigo', pt: 'Índigo', pl: 'Indygo', fr: 'Indigo', de: 'Indigo', es: 'Índigo' },
+    'color.amber': { ja: '山吹', en: 'Amber', pt: 'Âmbar', pl: 'Bursztynowy', fr: 'Ambre', de: 'Bernstein', es: 'Ámbar' },
+    'color.lavender': { ja: 'ラベンダー', en: 'Lavender', pt: 'Lavanda', pl: 'Lawendowy', fr: 'Lavande', de: 'Lavendel', es: 'Lavanda' },
+    'color.mint': { ja: 'ミント', en: 'Mint', pt: 'Menta', pl: 'Miętowy', fr: 'Menthe', de: 'Minze', es: 'Menta' },
+    'pattern.alt': { ja: '交互', en: 'Alternating', pt: 'Alternado', pl: 'Naprzemienny', fr: 'Alterné', de: 'Wechselnd', es: 'Alternado' },
+    'pattern.horizontal': { ja: '水平', en: 'Horizontal', pt: 'Horizontal', pl: 'Poziomy', fr: 'Horizontal', de: 'Horizontal', es: 'Horizontal' },
+    'pattern.spiral': { ja: 'スパイラル', en: 'Spiral', pt: 'Espiral', pl: 'Spiralny', fr: 'Spirale', de: 'Spirale', es: 'Espiral' },
+    'pattern.sapphire': { ja: 'サファイア', en: 'Sapphire', pt: 'Sapphire', pl: 'Sapphire', fr: 'Sapphire', de: 'Sapphire', es: 'Sapphire' },
+    'pattern.custom': { ja: 'カスタム(数式)', en: 'Custom (formula)', pt: 'Personalizado (fórmula)', pl: 'Niestandardowy (wzór)', fr: 'Personnalisé (formule)', de: 'Benutzerdefiniert (Formel)', es: 'Personalizado (fórmula)' },
+    'mapping.cycle': { ja: '巡回', en: 'Cycle', pt: 'Ciclo', pl: 'Cykl', fr: 'Cycle', de: 'Zyklus', es: 'Ciclo' },
+    'mapping.mirror': { ja: '折り返し', en: 'Mirror', pt: 'Espelho', pl: 'Lustro', fr: 'Miroir', de: 'Spiegeln', es: 'Espejo' },
+    'mapping.zone': { ja: 'グラデーション', en: 'Gradient', pt: 'Gradiente', pl: 'Gradient', fr: 'Dégradé', de: 'Verlauf', es: 'Degradado' },
+    'mapping.zoneChecker': { ja: 'グラデ+市松', en: 'Gradient + checker', pt: 'Gradiente + xadrez', pl: 'Gradient + szachownica', fr: 'Dégradé + damier', de: 'Verlauf + Schachbrett', es: 'Degradado + cuadros' },
+    'mappingHint.cycle': { ja: '0,1,2,…,N-1,0,1,… と繰り返す', en: 'Repeats 0,1,2,…,N-1,0,1,…', pt: 'Repete 0,1,2,…,N-1,0,1,…', pl: 'Powtarza 0,1,2,…,N-1,0,1,…', fr: 'Se répète 0,1,2,…,N-1,0,1,…', de: 'Wiederholt sich 0,1,2,…,N-1,0,1,…', es: 'Se repite 0,1,2,…,N-1,0,1,…' },
+    'mappingHint.mirror': { ja: '0,1,…,N-1,N-2,…,1,0 と折り返す。端で色が飛ばない', en: 'Bounces 0,1,…,N-1,N-2,…,1,0 — no color jump at the ends', pt: 'Alterna 0,1,…,N-1,N-2,…,1,0 — sem salto de cor nas extremidades', pl: 'Odbija 0,1,…,N-1,N-2,…,1,0 — bez skoku koloru na krawędziach', fr: 'Alterne 0,1,…,N-1,N-2,…,1,0 — pas de saut de couleur aux extrémités', de: 'Pendelt 0,1,…,N-1,N-2,…,1,0 — kein Farbsprung an den Enden', es: 'Rebota 0,1,…,N-1,N-2,…,1,0 — sin salto de color en los extremos' },
+    'mappingHint.zone': { ja: '高さ全体をN等分し、下へ行くほど後ろの色になる', en: 'Splits the whole height into N equal bands; colors advance further down', pt: 'Divide toda a altura em N partes iguais; as cores avançam conforme desce', pl: 'Dzieli całą wysokość na N równych stref; kolory przesuwają się w dół', fr: 'Divise toute la hauteur en N bandes égales ; les couleurs avancent vers le bas', de: 'Teilt die gesamte Höhe in N gleiche Zonen; Farben rücken weiter unten vor', es: 'Divide toda la altura en N bandas iguales; los colores avanzan hacia abajo' },
+    'mappingHint.zoneChecker': { ja: 'ゾーンの境目で2色を市松に混ぜる(サファイアと同じ考え方)', en: 'Mixes two colors in a checker pattern at zone boundaries (same idea as Sapphire)', pt: 'Mistura duas cores em xadrez nas bordas das zonas (mesma ideia do Sapphire)', pl: 'Miesza dwa kolory w szachownicę na granicach stref (ten sam pomysł co Sapphire)', fr: 'Mélange deux couleurs en damier aux limites des zones (même principe que Sapphire)', de: 'Mischt zwei Farben im Schachbrettmuster an Zonengrenzen (gleiches Prinzip wie Sapphire)', es: 'Mezcla dos colores a cuadros en los límites de las zonas (misma idea que Sapphire)' },
+    'kg.zero': { ja: '0(傾きなし)', en: '0 (no slant)', pt: '0 (sem inclinação)', pl: '0 (bez nachylenia)', fr: '0 (aucune inclinaison)', de: '0 (keine Neigung)', es: '0 (sin inclinación)' },
+    'kg.n': { ja: 'N(一周で1巡)', en: 'N (one lap per revolution)', pt: 'N (uma volta por revolução)', pl: 'N (jeden obieg na obrót)', fr: 'N (un tour par révolution)', de: 'N (eine Runde pro Umdrehung)', es: 'N (una vuelta por revolución)' },
+    'kg.nNeg': { ja: '-N(一周で1巡・逆巻き)', en: '-N (one lap per revolution, reversed)', pt: '-N (uma volta por revolução, invertida)', pl: '-N (jeden obieg na obrót, odwrócony)', fr: '-N (un tour par révolution, inversé)', de: '-N (eine Runde pro Umdrehung, umgekehrt)', es: '-N (una vuelta por revolución, invertida)' },
+    'wave.none': { ja: 'なし', en: 'None', pt: 'Nenhum', pl: 'Brak', fr: 'Aucun', de: 'Keine', es: 'Ninguno' },
+  });
+
+  I18N = Object.assign(I18N, {
+    'preset.caveatSpiral': { ja: '実機は球の正投影から出た約9.02の傾きですが、Kvは整数なので9に丸まります。ほぼ同じ見た目ですが厳密には別物です。', en: 'The real slant is about 9.02, derived from the sphere\'s orthographic projection, but Kv is an integer so it rounds to 9. Nearly identical, but not exact.', pt: 'A inclinação real é cerca de 9,02, derivada da projeção ortográfica da esfera, mas Kv é inteiro, então arredonda para 9. Quase idêntico, mas não exato.', pl: 'Rzeczywiste nachylenie to ok. 9,02, wynikające z rzutu ortogonalnego kuli, ale Kv jest liczbą całkowitą, więc zaokrągla się do 9. Niemal identyczne, ale nie dokładnie.', fr: 'L\'inclinaison réelle est d\'environ 9,02, issue de la projection orthographique de la sphère, mais Kv étant un entier, elle est arrondie à 9. Presque identique, mais pas exact.', de: 'Die reale Neigung beträgt etwa 9,02, abgeleitet aus der orthografischen Projektion der Kugel, aber Kv ist eine Ganzzahl und wird auf 9 gerundet. Fast identisch, aber nicht exakt.', es: 'La inclinación real es de unos 9,02, derivada de la proyección ortográfica de la esfera, pero Kv es un entero, así que se redondea a 9. Casi idéntico, pero no exacto.' },
+    'preset.caveatSapphire': { ja: '上下の位相ずらし・最下段のベタ塗りなど写真合わせの例外を含むため、数式では骨格までしか再現できません。', en: 'Includes photo-matched exceptions (a top/bottom phase shift, a flat-filled bottom row), so the formula can only reproduce the basic structure.', pt: 'Inclui exceções ajustadas por fotos (deslocamento de fase topo/base, última linha sólida), então a fórmula só reproduz a estrutura básica.', pl: 'Zawiera wyjątki dopasowane ze zdjęć (przesunięcie fazy góra/dół, jednolity najniższy wiersz), więc wzór odtwarza jedynie podstawową strukturę.', fr: 'Comporte des exceptions calées sur des photos (décalage de phase haut/bas, dernière rangée pleine), donc la formule ne reproduit que la structure de base.', de: 'Enthält von Fotos abgeleitete Ausnahmen (Phasenverschiebung oben/unten, unterste Reihe einfarbig), daher gibt die Formel nur die Grundstruktur wieder.', es: 'Incluye excepciones ajustadas por fotos (desfase entre arriba y abajo, última fila sólida), así que la fórmula solo reproduce la estructura básica.' },
+    'preset.caveatDefault': { ja: 'この柄は手作りのプリセットです。数式に近い出発点から編集を始められます。', en: 'This pattern is a hand-made preset. Editing starts from a formula that\'s close to it.', pt: 'Este padrão é uma predefinição feita à mão. A edição começa de uma fórmula próxima.', pl: 'Ten wzór to ręcznie wykonany gotowy wzorzec. Edycja rozpoczyna się od zbliżonego wzoru matematycznego.', fr: 'Ce motif est un préréglage fait à la main. L\'édition démarre à partir d\'une formule proche.', de: 'Dieses Muster ist ein handgefertigtes Preset. Die Bearbeitung startet von einer nahen Formel aus.', es: 'Este patrón es un preajuste hecho a mano. La edición comienza desde una fórmula cercana.' },
+    'preset.startFromHere': { ja: 'この柄から数式の編集を始める', en: 'Start editing the formula from this pattern', pt: 'Começar a editar a fórmula a partir deste padrão', pl: 'Rozpocznij edycję wzoru od tego wzoru', fr: 'Commencer l\'édition de la formule à partir de ce motif', de: 'Formel-Bearbeitung von diesem Muster aus starten', es: 'Empezar a editar la fórmula desde este patrón' },
+    'mode.hintPaint': { ja: '下のマス目をクリック(ドラッグでも可)して、選んだ色で塗ります。図面をそのまま書き写す使い方です。', en: 'Click (or drag) the grid below to paint with the selected color — for copying a diagram exactly.', pt: 'Clique (ou arraste) na grade abaixo para pintar com a cor selecionada — para copiar um desenho fielmente.', pl: 'Kliknij (lub przeciągnij) siatkę poniżej, aby malować wybranym kolorem — do wiernego odwzorowania rysunku.', fr: 'Cliquez (ou glissez) sur la grille ci-dessous pour peindre avec la couleur sélectionnée — pour recopier un plan à l\'identique.', de: 'Auf das Raster unten klicken (oder ziehen), um mit der gewählten Farbe zu malen — zum originalgetreuen Abzeichnen eines Plans.', es: 'Haz clic (o arrastra) en la cuadrícula de abajo para pintar con el color seleccionado — para copiar un plano tal cual.' },
+    'mode.hintTriPaint': { ja: '下のマス目をクリックして、対角線のどちら側かに応じて選んだ色で塗ります。実機の三角パネルを書き写す使い方です。', en: 'Click the grid below to paint whichever side of the diagonal you clicked with the selected color — for copying a real aircraft\'s triangular panels.', pt: 'Clique na grade abaixo para pintar o lado da diagonal clicado com a cor selecionada — para copiar os painéis triangulares reais.', pl: 'Kliknij siatkę poniżej, aby pomalować wybraną stronę przekątnej wybranym kolorem — do odwzorowania trójkątnych paneli rzeczywistego balonu.', fr: 'Cliquez sur la grille ci-dessous pour peindre le côté de la diagonale cliqué avec la couleur sélectionnée — pour recopier les panneaux triangulaires réels.', de: 'Auf das Raster unten klicken, um die angeklickte Seite der Diagonale mit der gewählten Farbe zu malen — zum Abzeichnen echter Dreieckspaneele.', es: 'Haz clic en la cuadrícula de abajo para pintar el lado de la diagonal en el que hiciste clic con el color seleccionado — para copiar los paneles triangulares reales.' },
+    'mode.hintFormula': { ja: 'パラメータで柄を作ります。こちらは共有コードとして配れます。', en: 'Builds the pattern from parameters. This can be shared as a code.', pt: 'Cria o padrão a partir de parâmetros. Pode ser compartilhado como código.', pl: 'Tworzy wzór z parametrów. Można go udostępnić jako kod.', fr: 'Crée le motif à partir de paramètres. Peut être partagé sous forme de code.', de: 'Erstellt das Muster aus Parametern. Kann als Code geteilt werden.', es: 'Crea el patrón a partir de parámetros. Se puede compartir como código.' },
+    'mode.paintHelpFormula': { ja: '(いまは数式の結果を表示しています)', en: '(currently showing the formula\'s result)', pt: '(exibindo o resultado da fórmula)', pl: '(obecnie pokazywany jest wynik wzoru)', fr: '(affiche actuellement le résultat de la formule)', de: '(zeigt aktuell das Ergebnis der Formel)', es: '(mostrando el resultado de la fórmula)' },
+  });
+
+  I18N = Object.assign(I18N, {
+    'cap.le4': { ja: '4色以内なので、数式でつくれば従来どおり6桁のコードになります', en: '4 colors or fewer, so the formula produces the classic 6-digit code', pt: '4 cores ou menos, então a fórmula gera o código clássico de 6 dígitos', pl: '4 kolory lub mniej, więc wzór daje klasyczny 6-cyfrowy kod', fr: '4 couleurs ou moins, la formule produit donc le code classique à 6 chiffres', de: '4 Farben oder weniger, daher erzeugt die Formel den klassischen 6-stelligen Code', es: '4 colores o menos, así que la fórmula genera el código clásico de 6 dígitos' },
+    'cap.gt4': { ja: '{n}色は5色目以降を含むため、Gで始まる可変長コードになります', en: '{n} colors include a 5th or later, so the code is a variable-length one starting with G', pt: '{n} cores incluem a 5ª ou posterior, então o código é de comprimento variável começando com G', pl: '{n} kolory obejmują 5. lub kolejny, więc kod ma zmienną długość i zaczyna się od G', fr: '{n} couleurs incluent une 5ᵉ ou plus, le code est donc à longueur variable et commence par G', de: '{n} Farben schließen eine 5. oder weitere ein, daher ist der Code variabel lang und beginnt mit G', es: '{n} colores incluyen un 5º o posterior, así que el código es de longitud variable y empieza por G' },
+    'slot.detailLabel': { ja: '色{n} に使うパレット', en: 'Palette for color {n}', pt: 'Paleta para a cor {n}', pl: 'Paleta dla koloru {n}', fr: 'Palette pour la couleur {n}', de: 'Palette für Farbe {n}', es: 'Paleta para el color {n}' },
+    'slot.paintingNote': { ja: 'この色でマスを塗ります', en: 'Cells are painted with this color', pt: 'As células são pintadas com esta cor', pl: 'Komórki są malowane tym kolorem', fr: 'Les cellules sont peintes avec cette couleur', de: 'Zellen werden mit dieser Farbe bemalt', es: 'Las celdas se pintan con este color' },
+    'copy.done': { ja: 'コピーしました', en: 'Copied', pt: 'Copiado', pl: 'Skopiowano', fr: 'Copié', de: 'Kopiert', es: 'Copiado' },
+    'export.gridFormatTri4': { ja: 'v4・三角マス目(圧縮)', en: 'v4 · triangle grid (compressed)', pt: 'v4 · grade triangular (compactada)', pl: 'v4 · siatka trójkątna (skompresowana)', fr: 'v4 · grille triangulaire (compressée)', de: 'v4 · Dreiecksraster (komprimiert)', es: 'v4 · cuadrícula triangular (comprimida)' },
+    'export.gridFormatTri3': { ja: 'v3・三角マス目', en: 'v3 · triangle grid', pt: 'v3 · grade triangular', pl: 'v3 · siatka trójkątna', fr: 'v3 · grille triangulaire', de: 'v3 · Dreiecksraster', es: 'v3 · cuadrícula triangular' },
+    'export.gridFormat2': { ja: 'v2・マス目', en: 'v2 · grid', pt: 'v2 · grade', pl: 'v2 · siatka', fr: 'v2 · grille', de: 'v2 · Raster', es: 'v2 · cuadrícula' },
+    'export.tooLong': { ja: '長すぎ', en: 'Too long', pt: 'Muito longo', pl: 'Za długi', fr: 'Trop long', de: 'Zu lang', es: 'Demasiado largo' },
+    'export.charCount': { ja: '{n}文字', en: '{n} chars', pt: '{n} caracteres', pl: '{n} znaków', fr: '{n} caractères', de: '{n} Zeichen', es: '{n} caracteres' },
+    'export.repFold': { ja: '(横{s}列 × {r}回の繰り返しに畳んで短縮)', en: '(folded as {s} columns × {r} repeats)', pt: '(dobrado como {s} colunas × {r} repetições)', pl: '(zwinięte jako {s} kolumn × {r} powtórzeń)', fr: '(replié en {s} colonnes × {r} répétitions)', de: '(gefaltet als {s} Spalten × {r} Wiederholungen)', es: '(plegado como {s} columnas × {r} repeticiones)' },
+    'export.fitsNote': { ja: '手打ちには長すぎますが、コピペ・URL・QRなら普通に配れます。ゲームのコード欄に貼り付ければ、実装を変えなくても同じ柄が出ます。', en: 'Too long to type by hand, but fine to share via copy-paste, a URL, or a QR code. Paste it into the game\'s code field to get the same pattern without any code change.', pt: 'Longo demais para digitar, mas ótimo para compartilhar por copiar e colar, URL ou QR code. Cole no campo de código do jogo para obter o mesmo padrão sem alterar o código.', pl: 'Za długi, by wpisać ręcznie, ale nadaje się do udostępnienia przez kopiowanie, URL lub kod QR. Wklej go w pole kodu w grze, aby uzyskać ten sam wzór bez zmiany kodu gry.', fr: 'Trop long à saisir à la main, mais adapté au partage par copier-coller, URL ou QR code. Collez-le dans le champ de code du jeu pour obtenir le même motif sans modifier le code.', de: 'Zu lang zum Abtippen, aber gut zum Teilen per Copy-Paste, URL oder QR-Code. In das Code-Feld des Spiels einfügen, um dasselbe Muster ohne Codeänderung zu erhalten.', es: 'Demasiado largo para escribirlo a mano, pero perfecto para compartir por copiar y pegar, una URL o un código QR. Pégalo en el campo de código del juego para obtener el mismo patrón sin cambiar el código.' },
+    'export.tooLongNote': { ja: '上限{max}文字を超えているため、このマス目はコードでは配れません。列や段を減らすか色数を絞るか、右の下書きを実装のプリセットとして組み込んでください。', en: 'This grid exceeds the {max}-character limit, so it can\'t be shared as a code. Reduce the columns/rows or the color count, or wire the draft on the right in as a preset.', pt: 'Esta grade excede o limite de {max} caracteres, então não pode ser compartilhada como código. Reduza colunas/linhas ou o número de cores, ou incorpore o rascunho à direita como predefinição.', pl: 'Ta siatka przekracza limit {max} znaków, więc nie można jej udostępnić jako kodu. Zmniejsz liczbę kolumn/wierszy lub kolorów, albo wbuduj szkic po prawej jako gotowy wzorzec.', fr: 'Cette grille dépasse la limite de {max} caractères, elle ne peut donc pas être partagée sous forme de code. Réduisez les colonnes/rangées ou le nombre de couleurs, ou intégrez le brouillon de droite comme préréglage.', de: 'Dieses Raster überschreitet das {max}-Zeichen-Limit und kann daher nicht als Code geteilt werden. Spalten/Reihen oder Farbanzahl reduzieren, oder den Entwurf rechts als Preset einbauen.', es: 'Esta cuadrícula supera el límite de {max} caracteres, por lo que no se puede compartir como código. Reduce columnas/filas o el número de colores, o incorpora el borrador de la derecha como preajuste.' },
+    'export.snippetTitlePreset': { ja: '実装に足す用(プリセット)', en: 'For the codebase (preset)', pt: 'Para o código (predefinição)', pl: 'Do implementacji (gotowy wzorzec)', fr: 'À ajouter au code (préréglage)', de: 'Für die Implementierung (Preset)', es: 'Para el código (preajuste)' },
+    'export.formatV0': { ja: 'v0・16進6桁', en: 'v0 · 6-digit hex', pt: 'v0 · hex de 6 dígitos', pl: 'v0 · 6-cyfrowy hex', fr: 'v0 · hex 6 chiffres', de: 'v0 · 6-stelliges Hex', es: 'v0 · hex de 6 dígitos' },
+    'export.formatV1': { ja: 'v1・可変長', en: 'v1 · variable length', pt: 'v1 · comprimento variável', pl: 'v1 · zmienna długość', fr: 'v1 · longueur variable', de: 'v1 · variable Länge', es: 'v1 · longitud variable' },
+    'export.codeNoteFormula': { ja: 'ゲームの気球選択モーダルにある「コード」欄にこのまま貼り付けると、同じ柄が再現されます。', en: 'Paste this as-is into the "code" field in the game\'s balloon-selection modal to reproduce the same pattern.', pt: 'Cole isto no campo "código" do modal de seleção de balão do jogo para reproduzir o mesmo padrão.', pl: 'Wklej to bez zmian w pole „kod" w oknie wyboru balonu w grze, aby odtworzyć ten sam wzór.', fr: 'Collez ceci tel quel dans le champ « code » de la fenêtre de sélection du ballon pour reproduire le même motif.', de: 'Dies unverändert in das „Code"-Feld im Ballonauswahl-Modal des Spiels einfügen, um dasselbe Muster zu erhalten.', es: 'Pega esto tal cual en el campo "código" del modal de selección de globo del juego para reproducir el mismo patrón.' },
+    'export.snippetTitleParams': { ja: '数式のパラメータ', en: 'Formula parameters', pt: 'Parâmetros da fórmula', pl: 'Parametry wzoru', fr: 'Paramètres de la formule', de: 'Formel-Parameter', es: 'Parámetros de la fórmula' },
+    'readout.pattern': { ja: '柄', en: 'Pattern', pt: 'Padrão', pl: 'Wzór', fr: 'Motif', de: 'Muster', es: 'Patrón' },
+    'readout.colorCount': { ja: '色数', en: 'Colors', pt: 'Cores', pl: 'Kolory', fr: 'Couleurs', de: 'Farben', es: 'Colores' },
+    'readout.grid': { ja: 'マス目', en: 'Grid', pt: 'Grade', pl: 'Siatka', fr: 'Grille', de: 'Raster', es: 'Cuadrícula' },
+    'readout.patternPaint': { ja: '手描きのマス目', en: 'Hand-painted grid', pt: 'Grade pintada à mão', pl: 'Ręcznie malowana siatka', fr: 'Grille peinte à la main', de: 'Handgemaltes Raster', es: 'Cuadrícula pintada a mano' },
+    'readout.patternTriPaint': { ja: '手描きの三角マス目', en: 'Hand-painted triangle grid', pt: 'Grade triangular pintada à mão', pl: 'Ręcznie malowana siatka trójkątna', fr: 'Grille triangulaire peinte à la main', de: 'Handgemaltes Dreiecksraster', es: 'Cuadrícula triangular pintada a mano' },
+    'skirt.hintDefault': { ja: 'スカートの色: 既定は<b>1色目</b>の濃いトーンを使います。', en: 'Skirt color: by default uses a darker tone of <b>color 1</b>.', pt: 'Cor da saia: por padrão usa um tom mais escuro da <b>cor 1</b>.', pl: 'Kolor spódnicy: domyślnie używa ciemniejszego odcienia <b>koloru 1</b>.', fr: 'Couleur de la jupe : utilise par défaut un ton plus foncé de la <b>couleur 1</b>.', de: 'Rockfarbe: verwendet standardmäßig einen dunkleren Farbton von <b>Farbe 1</b>.', es: 'Color de la falda: por defecto usa un tono más oscuro del <b>color 1</b>.' },
+    'skirt.hintTop': { ja: 'スカートの色: この柄は<b>最後に追加した色(色{n})</b>をそのまま使います(サファイアのように、実機の開口部が球皮の最上段と同じ濃色の柄向け)。', en: 'Skirt color: this pattern uses <b>the last-added color (color {n}) as-is</b> (for patterns like Sapphire, where the real opening matches the envelope\'s topmost tier).', pt: 'Cor da saia: este padrão usa <b>a última cor adicionada (cor {n}) diretamente</b> (para padrões como o Sapphire, cuja abertura real combina com a última fileira do balão).', pl: 'Kolor spódnicy: ten wzór używa <b>ostatnio dodanego koloru (kolor {n}) bez zmian</b> (dla wzorów jak Sapphire, gdzie rzeczywisty otwór ma taki sam kolor co najwyższy pas powłoki).', fr: 'Couleur de la jupe : ce motif utilise <b>la dernière couleur ajoutée (couleur {n}) telle quelle</b> (pour les motifs comme Sapphire, où l\'ouverture réelle correspond à la rangée la plus haute de l\'enveloppe).', de: 'Rockfarbe: dieses Muster verwendet <b>die zuletzt hinzugefügte Farbe (Farbe {n}) unverändert</b> (für Muster wie Sapphire, bei denen die reale Öffnung der obersten Hüllenreihe entspricht).', es: 'Color de la falda: este patrón usa <b>el último color añadido (color {n}) tal cual</b> (para patrones como Sapphire, donde la abertura real coincide con la fila superior del globo).' },
+  });
+
+  var LANG_KEY = 'balloon-pattern-editor-lang';
+  function detectDefaultLang() {
+    var codes = LANGS.map(function (l) { return l.code; });
+    var nav = (navigator.languages || [navigator.language || 'ja']);
+    for (var i = 0; i < nav.length; i++) {
+      var c = String(nav[i] || '').toLowerCase().slice(0, 2);
+      if (codes.indexOf(c) >= 0) return c;
+    }
+    return 'ja';
+  }
+  var currentLang = 'ja';
+  try {
+    var savedLang = localStorage.getItem(LANG_KEY);
+    currentLang = LANGS.some(function (l) { return l.code === savedLang; }) ? savedLang : detectDefaultLang();
+  } catch (e) { currentLang = detectDefaultLang(); }
+
+  function t(key, vars) {
+    var entry = I18N[key];
+    var s = entry ? (entry[currentLang] || entry.ja) : key;
+    if (vars) {
+      Object.keys(vars).forEach(function (k) {
+        s = s.split('{' + k + '}').join(String(vars[k]));
+      });
+    }
+    return s;
+  }
+
+  function applyI18n(root) {
+    var scope = root || document;
+    Array.prototype.forEach.call(scope.querySelectorAll('[data-i18n]'), function (el) {
+      el.textContent = t(el.getAttribute('data-i18n'));
+    });
+    Array.prototype.forEach.call(scope.querySelectorAll('[data-i18n-html]'), function (el) {
+      el.innerHTML = t(el.getAttribute('data-i18n-html'));
+    });
+    Array.prototype.forEach.call(scope.querySelectorAll('[data-i18n-title]'), function (el) {
+      el.title = t(el.getAttribute('data-i18n-title'));
+    });
+    Array.prototype.forEach.call(scope.querySelectorAll('[data-i18n-placeholder]'), function (el) {
+      el.placeholder = t(el.getAttribute('data-i18n-placeholder'));
+    });
+    Array.prototype.forEach.call(scope.querySelectorAll('[data-i18n-aria]'), function (el) {
+      el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria')));
+    });
+    document.title = t('title');
+    document.getElementById('kbdHint').innerHTML = t('save.kbdHint');
+  }
+
+  // UI側だけで使う小さな純関数(マス目の座標計算など)。パターン計算・符号化の
+  // 本体はすべてimport済みのballoon-appearance.jsが持つ
+  function mod(a, n) { return ((a % n) + n) % n; }
+  function clampInt(v, lo, hi) { return Math.min(hi, Math.max(lo, Math.round(v))); }
+
+  // 下書きスニペット(常に日本語で出す。balloon-appearance.js側のPATTERNSキーの
+  // 日本語ラベル)とグラデーション方式のヒント文言。UI表示専用でゲームの
+  // 判定ロジックには関わらない
+  var PATTERN_LABEL = { alt: '交互', horizontal: '水平', spiral: 'スパイラル', sapphire: 'サファイア' };
+  var MAPPING_LABEL = { cycle: '巡回', mirror: '折り返し', zone: 'グラデーション', zoneChecker: 'グラデ+市松' };
+  var MAPPING_HINT = {
+    cycle: '0,1,2,…,N-1,0,1,… と繰り返す',
+    mirror: '0,1,…,N-1,N-2,…,1,0 と折り返す。端で色が飛ばない',
+    zone: '高さ全体をN等分し、下へ行くほど後ろの色になる',
+    zoneChecker: 'ゾーンの境目で2色を市松に混ぜる(サファイアと同じ考え方)',
+  };
+  // カーネル(数式)のUI状態を有効な範囲へ丸める。壊れたlocalStorage・古い
+  // インポートファイルへの防御が目的で、実際の符号化(encodeAppearance)は
+  // これとは独立にballoon-appearance.js側で改めて検証・丸め込みが行われる
+  function clampKernelUI(k) {
+    var s = k || {};
+    return {
+      slices: KERNEL_SLICES.indexOf(s.slices) >= 0 ? s.slices : DEFAULT_KERNEL.slices,
+      kv: isFinite(s.kv) ? clampInt(s.kv, 0, KERNEL_KV_MAX) : DEFAULT_KERNEL.kv,
+      kg: KERNEL_KG_VALUES.indexOf(s.kg) >= 0 ? s.kg : DEFAULT_KERNEL.kg,
+      waveAmp: isFinite(s.waveAmp) ? clampInt(s.waveAmp, 0, 3) : DEFAULT_KERNEL.waveAmp,
+      wavePeriods: KERNEL_WAVE_PERIODS.indexOf(s.wavePeriods) >= 0 ? s.wavePeriods : DEFAULT_KERNEL.wavePeriods,
+      checker: !!s.checker,
+      mapping: KERNEL_MAPPINGS.indexOf(s.mapping) >= 0 ? s.mapping : DEFAULT_KERNEL.mapping,
+    };
+  }
+
+  // v0コード(16進6桁)が使える色数の上限。balloon-appearance.jsのV0形式は
+  // 過去の共有コードとの互換性のため将来も変わらない、frozenな値
+  var V0_MAX_COLORS = 4;
+
+  /* =======================================================================
+   * エディタの状態
+   * ======================================================================= */
+
+  var STORE_KEY = 'balloon-pattern-editor-v2';
+  var state = {
+    mode: 'formula',
+    pattern: CUSTOM_PATTERN,
+    kernel: Object.assign({}, DEFAULT_KERNEL),
+    gridS: 24,
+    gridR: 13,
+    grid: null,          // [row(下から0)][col] = 色スロット番号
+    triGrid: null,       // [row(下から0)][col] = {a,b,dir}(対角線で2色に割るマス目)
+    triTool: 'paint',    // 三角マス目モードでのクリック動作。'paint'|'flip'
+    colors: [8, 6, 1, 12],
+    paintSlot: 0,
+    soloFill: false,
+    tape: 'brown',
+    ref: { zoom: 100, x: null, y: null, w: 460, h: 420, open: false },
+    view: { az: 0.6, el: 0.12, dist: 46, auto: true, inside: false },
+  };
+
+  try {
+    var saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+    if (saved && typeof saved === 'object') {
+      Object.assign(state, saved);
+      state.view = Object.assign({ az: 0.6, el: 0.12, dist: 46, auto: true, inside: false }, saved.view || {});
+      state.ref = Object.assign({ zoom: 100, x: null, y: null, w: 460, h: 420, open: false }, saved.ref || {});
+    }
+  } catch (e) { /* 壊れた保存は無視して既定値で始める */ }
+
+  function newGrid(S, R, fill) {
+    var g = [];
+    for (var r = 0; r < R; r++) {
+      var row = new Array(S);
+      for (var c = 0; c < S; c++) row[c] = fill || 0;
+      g.push(row);
+    }
+    return g;
+  }
+
+  // 数式(または下敷きプリセット)の結果をマス目へ焼き込む
+  function gridFromPattern(S, R, patDef, N) {
+    var g = newGrid(S, R, 0);
+    for (var r = 0; r < R; r++) {
+      for (var c = 0; c < S; c++) {
+        var gv = (c + 0.5) * GORES / S;
+        var v = 1 - (r + 0.5) / R;
+        g[r][c] = clampInt(mod(patDef.colorIndex(gv, v, N), N), 0, N - 1);
+      }
+    }
+    return g;
+  }
+
+  // 数式(フォーミュラ)モードの見た目だけを取り出す。マス目モード中でも「今の数式の
+  // 結果をマス目に取り込む」ボタン(fromFormula)から呼ばれるため、state.modeには
+  // 依存させない
+  function formulaAppearance() {
+    var app = { pattern: state.pattern, colors: state.colors.slice(), soloFill: state.soloFill, tape: state.tape };
+    if (state.pattern === CUSTOM_PATTERN) app.kernel = state.kernel;
+    return app;
+  }
+
+  // 三角マス目(1マスを対角線で2色に割る柄)用のマス目を新規に作る
+  function newTriGrid(S, R) {
+    var g = [];
+    for (var r = 0; r < R; r++) {
+      var row = new Array(S);
+      for (var c = 0; c < S; c++) row[c] = { a: 0, b: 0, dir: 0 };
+      g.push(row);
+    }
+    return g;
+  }
+  // 既存の(1色)マス目を三角マス目へ持ち上げる。両側とも同じ色から始まるので
+  // 見た目はそのままで、そこから対角線を割ったり塗り分けたりして作り込める
+  function triGridFromGrid(grid) {
+    return grid.map(function (row) {
+      return row.map(function (v) { return { a: v, b: v, dir: 0 }; });
+    });
+  }
+
+  // 今の編集モードに応じて、balloon-appearance.js がそのまま受け取れる形の
+  // 見た目オブジェクトを組み立てる。共有コードの生成(encodeAppearance)も
+  // 3D/展開図の描画(resolvePattern)もすべてこれを経由するので、両者が
+  // 食い違うことはない
+  function currentAppearance() {
+    if (state.mode === 'paint') {
+      return {
+        pattern: GRID_PATTERN, colors: state.colors.slice(), soloFill: state.soloFill, tape: state.tape,
+        grid: { slices: state.gridS, rows: state.grid },
+      };
+    }
+    if (state.mode === 'triPaint') {
+      return {
+        pattern: TRI_GRID_PATTERN, colors: state.colors.slice(), soloFill: state.soloFill, tape: state.tape,
+        triGrid: { slices: state.gridS, rows: state.triGrid },
+      };
+    }
+    return formulaAppearance();
+  }
+
+  function activePattern() { return resolvePattern(currentAppearance()); }
+
+  // 横方向にどれだけの周期で繰り返しているかを調べる(1マス1色版)。共有コードの
+  // 符号化自体はencodeAppearance()に任せてあるので、ここでは「実装に足す用」
+  // スニペットのコメント表示にだけ使う(表示専用・符号化には関与しない)
+  function horizontalPeriod(rows, slices) {
+    for (var p = 1; p <= slices; p++) {
+      if (slices % p) continue;
+      var ok = true;
+      for (var r = 0; r < rows.length && ok; r++) {
+        for (var c = 0; c < slices; c++) {
+          if (rows[r][mod(c, rows[r].length)] !== rows[r][mod(c + p, rows[r].length)]) { ok = false; break; }
+        }
+      }
+      if (ok) return p;
+    }
+    return slices;
+  }
+  // horizontalPeriod()の三角マス目版(表示専用)
+  function horizontalPeriodTri(rows, slices) {
+    function sameCell(x, y) { return x.a === y.a && x.b === y.b && x.dir === y.dir; }
+    for (var p = 1; p <= slices; p++) {
+      if (slices % p) continue;
+      var ok = true;
+      for (var r = 0; r < rows.length && ok; r++) {
+        for (var c = 0; c < slices; c++) {
+          if (!sameCell(rows[r][mod(c, rows[r].length)], rows[r][mod(c + p, rows[r].length)])) { ok = false; break; }
+        }
+      }
+      if (ok) return p;
+    }
+    return slices;
+  }
+
+  if (!state.grid || state.grid.length !== state.gridR || state.grid[0].length !== state.gridS) {
+    state.grid = gridFromPattern(state.gridS, state.gridR, PATTERNS.sapphire, state.colors.length);
+  }
+  if (!state.triGrid || state.triGrid.length !== state.gridR || state.triGrid[0].length !== state.gridS) {
+    state.triGrid = triGridFromGrid(state.grid);
+  }
+
+  function persist() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* 保存できなくても続行 */ }
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  /* =======================================================================
+   * 「作業」の中身(数式/マス目/配色など)だけを取り出す。
+   * 視点(view)や参考画像の窓の位置(ref)はUndo・保存/読み込みの対象にしない
+   * (どちらも「今どう見ているか」でしかなく、柄そのものではないため)
+   * ======================================================================= */
+  var CONTENT_KEYS = ['mode', 'pattern', 'kernel', 'gridS', 'gridR', 'grid', 'triGrid', 'triTool', 'colors', 'paintSlot', 'soloFill', 'tape'];
+  function cloneContent(src) {
+    var out = {};
+    CONTENT_KEYS.forEach(function (k) { out[k] = JSON.parse(JSON.stringify(src[k])); });
+    return out;
+  }
+  // 保存データが壊れている・古い形式でも描画で落ちないように当てはめる。
+  // (ファイルから読み込む・Undo/Redoで復元する、いずれもここを通す)
+  function applyContent(snap) {
+    CONTENT_KEYS.forEach(function (k) {
+      if (snap[k] !== undefined) state[k] = JSON.parse(JSON.stringify(snap[k]));
+    });
+    var S = KERNEL_SLICES.indexOf(state.gridS) >= 0 ? state.gridS : DEFAULT_KERNEL.slices;
+    var R = (Number.isInteger(state.gridR) && state.gridR >= 4 && state.gridR <= 24) ? state.gridR : 13;
+    state.gridS = S; state.gridR = R;
+    if (!Array.isArray(state.grid) || state.grid.length !== R || !Array.isArray(state.grid[0]) || state.grid[0].length !== S) {
+      var n = Array.isArray(state.colors) && state.colors.length ? state.colors.length : 4;
+      state.grid = gridFromPattern(S, R, PATTERNS.sapphire, n);
+    }
+    if (!Array.isArray(state.triGrid) || state.triGrid.length !== R
+      || !Array.isArray(state.triGrid[0]) || state.triGrid[0].length !== S) {
+      state.triGrid = triGridFromGrid(state.grid);
+    }
+    state.triTool = state.triTool === 'flip' ? 'flip' : 'paint';
+  }
+
+  /* =======================================================================
+   * Undo / Redo
+   * ドラッグ(マス目塗り・スライダー)は1操作分だけ記録したいので、
+   * beginGesture()で操作開始時に1回だけ退避し、endGesture()で確定させる。
+   * クリックなど単発の操作はsnapshotNow()(begin+endを一度に行う)で足りる
+   * ======================================================================= */
+  var history = { past: [], future: [] };
+  var HISTORY_LIMIT = 80;
+  var pendingSnapshot = null;
+
+  function beginGesture() {
+    if (pendingSnapshot) return; // 進行中の操作があれば重ねて記録しない
+    pendingSnapshot = cloneContent(state);
+  }
+  function endGesture() {
+    if (!pendingSnapshot) return;
+    history.past.push(pendingSnapshot);
+    if (history.past.length > HISTORY_LIMIT) history.past.shift();
+    history.future = [];
+    pendingSnapshot = null;
+    syncUndoButtons();
+  }
+  function snapshotNow() { beginGesture(); endGesture(); }
+
+  function undo() {
+    if (!history.past.length) return;
+    var cur = cloneContent(state);
+    var prev = history.past.pop();
+    history.future.push(cur);
+    applyContent(prev);
+    syncAll();
+    syncUndoButtons();
+  }
+  function redo() {
+    if (!history.future.length) return;
+    var cur = cloneContent(state);
+    var next = history.future.pop();
+    history.past.push(cur);
+    applyContent(next);
+    syncAll();
+    syncUndoButtons();
+  }
+  function syncUndoButtons() {
+    document.getElementById('undoBtn').disabled = !history.past.length;
+    document.getElementById('redoBtn').disabled = !history.future.length;
+  }
+  document.getElementById('undoBtn').addEventListener('click', undo);
+  document.getElementById('redoBtn').addEventListener('click', redo);
+
+  /* =======================================================================
+   * 名前を付けて保存(ブラウザ内) / ファイルに書き出し・読み込み
+   * ======================================================================= */
+  var SAVES_KEY = 'balloon-pattern-editor-saves';
+  function loadSavesList() {
+    try {
+      var arr = JSON.parse(localStorage.getItem(SAVES_KEY) || '[]');
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) { return []; }
+  }
+  function writeSavesList(arr) {
+    try { localStorage.setItem(SAVES_KEY, JSON.stringify(arr)); } catch (e) { /* 保存できなくても続行 */ }
+  }
+  function findSave(id) {
+    var saves = loadSavesList();
+    for (var i = 0; i < saves.length; i++) if (saves[i].id === id) return saves[i];
+    return null;
+  }
+  function renderSavesList() {
+    var sel = document.getElementById('savedList');
+    var saves = loadSavesList();
+    var cur = sel.value;
+    sel.innerHTML = '<option value="">' + t('save.savedListLabel', { n: saves.length }) + '</option>'
+      + saves.slice().sort(function (a, b) { return b.savedAt - a.savedAt; }).map(function (s) {
+        var d = new Date(s.savedAt);
+        var stamp = (d.getMonth() + 1) + '/' + d.getDate() + ' '
+          + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+        return '<option value="' + s.id + '">' + escapeHtml(s.name) + '(' + stamp + ')</option>';
+      }).join('');
+    if (saves.some(function (s) { return s.id === cur; })) sel.value = cur;
+    var hasSel = !!sel.value;
+    document.getElementById('loadNamedBtn').disabled = !hasSel;
+    document.getElementById('deleteNamedBtn').disabled = !hasSel;
+  }
+  function showSaveMsg(text) {
+    var msg = document.getElementById('saveMsg');
+    msg.textContent = text;
+    setTimeout(function () { if (msg.textContent === text) msg.textContent = ''; }, 2400);
+  }
+
+  document.getElementById('savedList').addEventListener('change', function () {
+    var hasSel = !!this.value;
+    document.getElementById('loadNamedBtn').disabled = !hasSel;
+    document.getElementById('deleteNamedBtn').disabled = !hasSel;
+  });
+
+  document.getElementById('saveNamedBtn').addEventListener('click', function () {
+    var nameInput = document.getElementById('saveName');
+    var name = nameInput.value.trim();
+    if (!name) { showSaveMsg(t('save.enterName')); nameInput.focus(); return; }
+    var saves = loadSavesList();
+    var existing = null;
+    for (var i = 0; i < saves.length; i++) if (saves[i].name === name) existing = saves[i];
+    if (existing && !confirm(t('save.confirmOverwrite', { name: name }))) return;
+    var entry = {
+      id: existing ? existing.id : Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      name: name, savedAt: Date.now(), content: cloneContent(state),
+    };
+    saves = existing ? saves.map(function (s) { return s.id === entry.id ? entry : s; }) : saves.concat([entry]);
+    writeSavesList(saves);
+    renderSavesList();
+    document.getElementById('savedList').value = entry.id;
+    document.getElementById('loadNamedBtn').disabled = false;
+    document.getElementById('deleteNamedBtn').disabled = false;
+    showSaveMsg(t('save.savedAs', { name: name }));
+  });
+
+  document.getElementById('loadNamedBtn').addEventListener('click', function () {
+    var entry = findSave(document.getElementById('savedList').value);
+    if (!entry) return;
+    snapshotNow(); // 読込前の状態にUndoで戻せるようにする
+    applyContent(entry.content);
+    syncAll();
+    document.getElementById('saveName').value = entry.name;
+    showSaveMsg(t('save.loadedAs', { name: entry.name }));
+  });
+
+  document.getElementById('deleteNamedBtn').addEventListener('click', function () {
+    var id = document.getElementById('savedList').value;
+    var entry = findSave(id);
+    if (!entry) return;
+    if (!confirm(t('save.confirmDelete', { name: entry.name }))) return;
+    writeSavesList(loadSavesList().filter(function (s) { return s.id !== id; }));
+    renderSavesList();
+    showSaveMsg(t('save.deletedMsg'));
+  });
+
+  // ページはサンドボックス化されたフレームの中で動くため、<a download>による
+  // 直接ダウンロードは効かない。window.claude.downloads.save()経由で、
+  // 「本当に保存するか」を利用者に確認してもらってから保存する
+  document.getElementById('exportFileBtn').addEventListener('click', function () {
+    if (!window.claude || !window.claude.downloads) {
+      showSaveMsg(t('save.exportUnsupported'));
+      return;
+    }
+    var name = document.getElementById('saveName').value.trim() || t('save.defaultName');
+    var payload = { app: 'balloon-pattern-editor', version: 1, name: name, savedAt: Date.now(), content: cloneContent(state) };
+    var filename = name.replace(/[\\/:*?"<>|]/g, '_') + '.json';
+    window.claude.downloads.save({ filename: filename, data: JSON.stringify(payload, null, 2) }).then(
+      function () { showSaveMsg(t('save.exportedMsg')); },
+      function (err) {
+        var byCode = {
+          declined: t('save.err.declined'),
+          rate_limited: t('save.err.rateLimited'),
+          too_large: t('save.err.tooLarge'),
+          rejected_extension: t('save.err.rejectedExt'),
+          unavailable: t('save.exportUnsupported'),
+        };
+        showSaveMsg((err && byCode[err.code]) || t('save.err.generic'));
+      }
+    );
+  });
+
+  document.getElementById('importFile').addEventListener('change', function (e) {
+    var file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var data;
+      try { data = JSON.parse(reader.result); } catch (err) {
+        showSaveMsg(t('save.importInvalidJson'));
+        return;
+      }
+      var content = data && typeof data.content === 'object' ? data.content : null;
+      if (!content || !Array.isArray(content.colors)) {
+        showSaveMsg(t('save.importInvalidData'));
+        return;
+      }
+      snapshotNow();
+      applyContent(content);
+      syncAll();
+      if (data.name) document.getElementById('saveName').value = data.name;
+      showSaveMsg(t('save.importedMsg'));
+    };
+    reader.readAsText(file);
+  });
+
+  /* =======================================================================
+   * 球皮テクスチャ(main.jsのbuildGoreTexture()と同じ描き方)
+   * ======================================================================= */
+  var texCanvas = document.createElement('canvas');
+  texCanvas.width = 512; texCanvas.height = 64;
+  var texCtx = texCanvas.getContext('2d');
+
+  function tapeHex() { return state.tape === 'white' ? '#eceff1' : '#5c3a26'; }
+
+  function buildGoreTexture() {
+    var app = currentAppearance();
+    var pat0 = resolvePattern(app);
+    // 三角マス目は対角線をアンチエイリアスで滑らかに見せる必要があるため、
+    // 他の柄より縦解像度を上げる(64pxのままだと1マスの縦幅が数pxしかなく、
+    // 本来直線のはずの対角線がぼやけた階段状にしか見えない)。キャンバスの
+    // 高さを変えると内容が消えるので、必要な時だけ変更する
+    var wantH = pat0.subCell ? 256 : 64;
+    if (texCanvas.height !== wantH) texCanvas.height = wantH;
+    var ctx = texCtx, w = 512 / GORES;
+    var palettes = state.colors.map(function (i) { return BALLOON_COLORS[i]; });
+    var tape = state.tape, seam = tapeHex();
+
+    if (palettes.length === 1) {
+      var base = palettes[0];
+      for (var i = 0; i < GORES; i++) {
+        ctx.fillStyle = state.soloFill ? base.cols[0] : base.cols[i % 2];
+        ctx.fillRect(i * w, 0, w, texCanvas.height);
+        if (tape !== 'transparent') { ctx.fillStyle = seam; ctx.fillRect(i * w, 0, 2, texCanvas.height); }
+      }
+      return texCanvas;
+    }
+    var filled = palettes.map(function (p) { return p.ui; });
+    var pat = pat0;
+    var slices = pat.fineSlices || GORES;
+    var fine = slices !== GORES;
+    if (pat.subCell && pat.rows) {
+      // 三角マス目はセルを対角線で割った2枚の三角形として直接描画する。
+      // ピクセル単位で最近傍の色を拾う方式だと、マス目の解像度なりに
+      // 対角線が階段状に見えてしまうため、キャンバスの多角形塗りつぶし
+      // (アンチエイリアス込み)で厳密な直線として描く
+      var triS = pat.slices, triR = pat.rows.length;
+      var triCw = 512 / triS;
+      for (var tr = 0; tr < triR; tr++) {
+        var triRow = pat.rows[tr];
+        // rows[0]が最下段(裾側)・rows[R-1]が最上段(頂点側)という並びなので、
+        // キャンバス上(y=0が頂点側)には逆順で対応させる
+        var ty0 = (triR - tr - 1) / triR * texCanvas.height;
+        var ty1 = (triR - tr) / triR * texCanvas.height;
+        for (var tk = 0; tk < triS; tk++) {
+          var triCell = triRow[tk];
+          var tx0 = tk * triCw, tx1 = (tk + 1) * triCw;
+          var triColA = filled[Math.min(filled.length - 1, triCell.a)];
+          var triColB = filled[Math.min(filled.length - 1, triCell.b)];
+          // マス全体をまずb色でfillRect(他の柄と同じ塗り方なので継ぎ目が出ない)
+          // し、その上からa側の三角形だけ重ねて塗る。アンチエイリアスが掛かる
+          // 境界を対角線1本だけに絞ることで、マス目の外枠に余計な継ぎ目が
+          // 出ないようにする
+          ctx.fillStyle = triColB;
+          ctx.fillRect(tx0, ty0, tx1 - tx0, ty1 - ty0);
+          ctx.beginPath();
+          if (triCell.dir === 0) { ctx.moveTo(tx0, ty0); ctx.lineTo(tx0, ty1); ctx.lineTo(tx1, ty1); }
+          else { ctx.moveTo(tx0, ty0); ctx.lineTo(tx1, ty0); ctx.lineTo(tx0, ty1); }
+          ctx.closePath();
+          ctx.fillStyle = triColA;
+          ctx.fill();
+        }
+      }
+    } else {
+      var sw = 512 / slices;
+      for (var k = 0; k < slices; k++) {
+        var gv = fine ? (k + 0.5) * GORES / slices : k;
+        var x0 = Math.round(k * sw), x1 = Math.round((k + 1) * sw);
+        for (var y = 0; y < texCanvas.height; y++) {
+          ctx.fillStyle = filled[colorSlotAt(app, gv, (y + 0.5) / texCanvas.height)];
+          ctx.fillRect(x0, y, x1 - x0, 1);
+        }
+      }
+    }
+    if (tape !== 'transparent') {
+      var seams = pat.alignSeams ? slices : GORES;
+      var seamW = 512 / seams;
+      for (var s = 0; s < seams; s++) { ctx.fillStyle = seam; ctx.fillRect(Math.round(s * seamW), 0, 2, texCanvas.height); }
+    }
+    return texCanvas;
+  }
+
+  function skirtColorHex() {
+    var pat = activePattern();
+    var cols = state.colors;
+    var useTop = !!pat.skirtUsesTopColor && cols.length > 1;
+    var pal = BALLOON_COLORS[useTop ? cols[cols.length - 1] : cols[0]] || BALLOON_COLORS[0];
+    return useTop ? pal.ui : pal.cols[1];
+  }
+
+  /* =======================================================================
+   * 3Dプレビュー(WebGL)。形状は main.js の buildBalloon() と同じ寸法:
+   *   球皮 = 半径9の球を(1,1.12,1)に伸ばして y=16.5 に置く
+   *   スカート = 上半径3.0/下半径1.5・高さ3.2 の筒を y=5.4 に
+   *   ゴンドラ = 1.4角・高さ1.1 の箱
+   * ======================================================================= */
+  var glCanvas = document.getElementById('glCanvas');
+  var gl = null;
+  try {
+    gl = glCanvas.getContext('webgl', { antialias: true, alpha: false })
+      || glCanvas.getContext('experimental-webgl', { antialias: true, alpha: false });
+  } catch (e) { gl = null; }
+
+  var VS = [
+    'attribute vec3 aPos; attribute vec3 aNormal; attribute vec2 aUv;',
+    'uniform mat4 uProj, uView; uniform vec3 uOffset;',
+    'varying vec3 vN; varying vec2 vUv;',
+    'void main() {',
+    '  vN = aNormal;',
+    '  vUv = aUv;',
+    '  gl_Position = uProj * uView * vec4(aPos + uOffset, 1.0);',
+    '}',
+  ].join('\n');
+
+  var FS = [
+    'precision mediump float;',
+    'varying vec3 vN; varying vec2 vUv;',
+    'uniform sampler2D uMap; uniform vec3 uColor; uniform float uUseMap; uniform float uFlip;',
+    'void main() {',
+    '  vec3 base = mix(uColor, texture2D(uMap, vUv).rgb, uUseMap);',
+    '  vec3 n = normalize(vN) * uFlip;',
+    '  vec3 L = normalize(vec3(-0.45, 0.78, 0.44));',
+    // MeshLambertMaterial 相当: 環境光 + 拡散光。空からの弱い返り光も少し足す
+    '  float diff = max(dot(n, L), 0.0);',
+    '  float sky = 0.5 + 0.5 * n.y;',
+    '  vec3 lit = base * (0.42 + 0.62 * diff + 0.12 * sky);',
+    '  gl_FragColor = vec4(lit, 1.0);',
+    '}',
+  ].join('\n');
+
+  var prog = null, attribs = {}, uniforms = {}, tex = null, meshes = [];
+
+  function compile(type, src) {
+    var s = gl.createShader(type);
+    gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  }
+
+  function makeMesh(pos, norm, uv, idx) {
+    function buf(target, data, Ctor) {
+      var b = gl.createBuffer();
+      gl.bindBuffer(target, b);
+      gl.bufferData(target, new Ctor(data), gl.STATIC_DRAW);
+      return b;
+    }
+    return {
+      pos: buf(gl.ARRAY_BUFFER, pos, Float32Array),
+      norm: buf(gl.ARRAY_BUFFER, norm, Float32Array),
+      uv: buf(gl.ARRAY_BUFFER, uv, Float32Array),
+      idx: buf(gl.ELEMENT_ARRAY_BUFFER, idx, Uint16Array),
+      count: idx.length,
+    };
+  }
+
+  // THREE.SphereGeometry と同じ頂点並び・同じUVで楕円体を作る
+  function buildSphere(radius, wSeg, hSeg, yScale) {
+    var pos = [], norm = [], uv = [], idx = [];
+    for (var iy = 0; iy <= hSeg; iy++) {
+      var vv = iy / hSeg, theta = vv * Math.PI;
+      for (var ix = 0; ix <= wSeg; ix++) {
+        var uu = ix / wSeg, phi = uu * Math.PI * 2;
+        var x = -radius * Math.cos(phi) * Math.sin(theta);
+        var y = radius * Math.cos(theta);
+        var z = radius * Math.sin(phi) * Math.sin(theta);
+        pos.push(x, y * yScale, z);
+        var nx = x, ny = y / yScale, nz = z;
+        var len = Math.hypot(nx, ny, nz) || 1;
+        norm.push(nx / len, ny / len, nz / len);
+        uv.push(uu, 1 - vv);
+      }
+    }
+    for (var iy2 = 0; iy2 < hSeg; iy2++) {
+      for (var ix2 = 0; ix2 < wSeg; ix2++) {
+        var a = iy2 * (wSeg + 1) + ix2, b = a + wSeg + 1;
+        idx.push(a, b, a + 1, b, b + 1, a + 1);
+      }
+    }
+    return makeMesh(pos, norm, uv, idx);
+  }
+
+  function buildCone(rTop, rBot, h, segs) {
+    var pos = [], norm = [], uv = [], idx = [];
+    var slope = Math.atan2(rBot - rTop, h);
+    for (var iy = 0; iy <= 1; iy++) {
+      var r = iy === 0 ? rTop : rBot, y = iy === 0 ? h / 2 : -h / 2;
+      for (var ix = 0; ix <= segs; ix++) {
+        var a = (ix / segs) * Math.PI * 2;
+        pos.push(Math.cos(a) * r, y, Math.sin(a) * r);
+        norm.push(Math.cos(a) * Math.cos(slope), -Math.sin(slope), Math.sin(a) * Math.cos(slope));
+        uv.push(ix / segs, 1 - iy);
+      }
+    }
+    for (var i = 0; i < segs; i++) {
+      var t = i, b2 = i + segs + 1;
+      idx.push(t, b2, t + 1, b2, b2 + 1, t + 1);
+    }
+    return makeMesh(pos, norm, uv, idx);
+  }
+
+  function buildBox(w, h, d) {
+    var pos = [], norm = [], uv = [], idx = [];
+    var faces = [
+      [[1, 0, 0], [0, 0, -1], [0, 1, 0]], [[-1, 0, 0], [0, 0, 1], [0, 1, 0]],
+      [[0, 1, 0], [1, 0, 0], [0, 0, 1]], [[0, -1, 0], [1, 0, 0], [0, 0, -1]],
+      [[0, 0, 1], [1, 0, 0], [0, 1, 0]], [[0, 0, -1], [-1, 0, 0], [0, 1, 0]],
+    ];
+    var hs = [w / 2, h / 2, d / 2];
+    faces.forEach(function (f, fi) {
+      var n = f[0], ua = f[1], va = f[2];
+      for (var s = 0; s < 4; s++) {
+        var su = (s === 1 || s === 2) ? 1 : -1;
+        var sv = (s >= 2) ? 1 : -1;
+        var p = [0, 0, 0];
+        for (var k = 0; k < 3; k++) p[k] = (n[k] + ua[k] * su + va[k] * sv) * hs[k];
+        pos.push(p[0], p[1], p[2]);
+        norm.push(n[0], n[1], n[2]);
+        uv.push((su + 1) / 2, (sv + 1) / 2);
+      }
+      var o = fi * 4;
+      idx.push(o, o + 1, o + 2, o + 1, o + 3, o + 2);
+    });
+    return makeMesh(pos, norm, uv, idx);
+  }
+
+  /* ---- 行列 ---- */
+  function perspective(fovy, aspect, near, far) {
+    var f = 1 / Math.tan(fovy / 2), nf = 1 / (near - far);
+    return [f / aspect, 0, 0, 0, 0, f, 0, 0, 0, 0, (far + near) * nf, -1, 0, 0, 2 * far * near * nf, 0];
+  }
+  function lookAt(eye, center, up) {
+    var z0 = eye[0] - center[0], z1 = eye[1] - center[1], z2 = eye[2] - center[2];
+    var zl = Math.hypot(z0, z1, z2) || 1; z0 /= zl; z1 /= zl; z2 /= zl;
+    var x0 = up[1] * z2 - up[2] * z1, x1 = up[2] * z0 - up[0] * z2, x2 = up[0] * z1 - up[1] * z0;
+    var xl = Math.hypot(x0, x1, x2) || 1; x0 /= xl; x1 /= xl; x2 /= xl;
+    var y0 = z1 * x2 - z2 * x1, y1 = z2 * x0 - z0 * x2, y2 = z0 * x1 - z1 * x0;
+    return [x0, y0, z0, 0, x1, y1, z1, 0, x2, y2, z2, 0,
+      -(x0 * eye[0] + x1 * eye[1] + x2 * eye[2]),
+      -(y0 * eye[0] + y1 * eye[1] + y2 * eye[2]),
+      -(z0 * eye[0] + z1 * eye[1] + z2 * eye[2]), 1];
+  }
+
+  var envMesh = null, skirtMesh = null, basketMesh = null, poleMesh = null;
+
+  function initGL() {
+    if (!gl) {
+      glCanvas.style.display = 'none';
+      document.getElementById('glFallback').style.display = 'block';
+      return false;
+    }
+    var p = gl.createProgram();
+    gl.attachShader(p, compile(gl.VERTEX_SHADER, VS));
+    gl.attachShader(p, compile(gl.FRAGMENT_SHADER, FS));
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    prog = p;
+    gl.useProgram(p);
+    attribs.pos = gl.getAttribLocation(p, 'aPos');
+    attribs.norm = gl.getAttribLocation(p, 'aNormal');
+    attribs.uv = gl.getAttribLocation(p, 'aUv');
+    ['uProj', 'uView', 'uOffset', 'uMap', 'uColor', 'uUseMap', 'uFlip'].forEach(function (n) {
+      uniforms[n] = gl.getUniformLocation(p, n);
+    });
+
+    tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    // 拡大時は補間せずマス目の境目をはっきり出す(実機は滑らかに補間するが、
+    // エディタでは「どのマスが何色か」が読み取れることを優先する)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+    envMesh = buildSphere(9, 48, 36, ENV_Y_SCALE);
+    skirtMesh = buildCone(3.0, 1.5, 3.2, 24);
+    basketMesh = buildBox(1.4, 1.1, 1.4);
+    poleMesh = buildCone(0.05, 0.05, 2.8, 6);
+
+    gl.enable(gl.DEPTH_TEST);
+    gl.enable(gl.CULL_FACE);
+    return true;
+  }
+
+  function uploadTexture() {
+    if (!gl) return;
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, texCanvas);
+  }
+
+  function hexToRgbNorm(hex) {
+    var n = parseInt(hex.replace('#', ''), 16);
+    return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+  }
+
+  function drawMesh(m, offset, useMap, color, flip) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, m.pos);
+    gl.enableVertexAttribArray(attribs.pos);
+    gl.vertexAttribPointer(attribs.pos, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, m.norm);
+    gl.enableVertexAttribArray(attribs.norm);
+    gl.vertexAttribPointer(attribs.norm, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, m.uv);
+    gl.enableVertexAttribArray(attribs.uv);
+    gl.vertexAttribPointer(attribs.uv, 2, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, m.idx);
+    gl.uniform3fv(uniforms.uOffset, offset);
+    gl.uniform1f(uniforms.uUseMap, useMap ? 1 : 0);
+    gl.uniform1f(uniforms.uFlip, flip ? -1 : 1);
+    gl.uniform3fv(uniforms.uColor, color || [1, 1, 1]);
+    gl.drawElements(gl.TRIANGLES, m.count, gl.UNSIGNED_SHORT, 0);
+  }
+
+  function resizeGL() {
+    if (!gl) return;
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var rect = glCanvas.getBoundingClientRect();
+    var w = Math.max(1, Math.round(rect.width * dpr)), h = Math.max(1, Math.round(rect.height * dpr));
+    if (glCanvas.width !== w || glCanvas.height !== h) { glCanvas.width = w; glCanvas.height = h; }
+  }
+
+  function renderGL() {
+    if (!gl || !prog) return;
+    resizeGL();
+    gl.viewport(0, 0, glCanvas.width, glCanvas.height);
+    gl.clearColor(0.145, 0.184, 0.322, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    var aspect = glCanvas.width / glCanvas.height;
+    var v = state.view;
+    var eye, target;
+    if (v.inside) {
+      // 内側: 球皮の中に入って見上げる(ゲームのゴンドラ視点で見える側)。
+      // 見る向きは方位角azと仰角elで決め、既定では斜め上を向く
+      eye = [0, 13.0, 0];
+      var el = Math.max(-0.2, v.el + 0.55);
+      target = [
+        eye[0] + Math.cos(el) * Math.cos(v.az),
+        eye[1] + Math.sin(el),
+        eye[2] + Math.cos(el) * Math.sin(v.az),
+      ];
+    } else {
+      target = [0, 14.5, 0];
+      eye = [
+        target[0] + v.dist * Math.cos(v.el) * Math.cos(v.az),
+        target[1] + v.dist * Math.sin(v.el),
+        target[2] + v.dist * Math.cos(v.el) * Math.sin(v.az),
+      ];
+    }
+    gl.uniformMatrix4fv(uniforms.uProj, false, perspective((v.inside ? 70 : 34) * Math.PI / 180, aspect, 0.1, 400));
+    gl.uniformMatrix4fv(uniforms.uView, false, lookAt(eye, target, [0, 1, 0]));
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.uniform1i(uniforms.uMap, 0);
+
+    if (v.inside) {
+      // 内側から見るときは球皮の裏面を描く
+      gl.cullFace(gl.FRONT);
+      drawMesh(envMesh, [0, 16.5, 0], true, null, true);
+      gl.cullFace(gl.BACK);
+      return;
+    }
+    gl.cullFace(gl.BACK);
+    drawMesh(envMesh, [0, 16.5, 0], true, null, false);
+    drawMesh(skirtMesh, [0, 5.4, 0], false, hexToRgbNorm(skirtColorHex()), false);
+    drawMesh(basketMesh, [0, 0.55, 0], false, hexToRgbNorm('#6d4c33'), false);
+    for (var i = 0; i < 4; i++) {
+      var sx = (i < 2 ? -1 : 1) * 0.62, sz = (i % 2 ? -1 : 1) * 0.62;
+      drawMesh(poleMesh, [sx, 2.5, sz], false, hexToRgbNorm('#5c3a26'), false);
+    }
+  }
+
+  /* ---- 視点操作 ---- */
+  var dragging = false, lastX = 0, lastY = 0;
+  glCanvas.addEventListener('pointerdown', function (e) {
+    dragging = true; lastX = e.clientX; lastY = e.clientY;
+    state.view.auto = false; syncViewButtons();
+    glCanvas.classList.add('dragging');
+    glCanvas.setPointerCapture(e.pointerId);
+  });
+  glCanvas.addEventListener('pointermove', function (e) {
+    if (!dragging) return;
+    state.view.az += (e.clientX - lastX) * 0.008;
+    state.view.el = Math.max(-1.2, Math.min(1.2, state.view.el + (e.clientY - lastY) * 0.006));
+    lastX = e.clientX; lastY = e.clientY;
+  });
+  function endDrag(e) {
+    if (!dragging) return;
+    dragging = false;
+    glCanvas.classList.remove('dragging');
+    try { glCanvas.releasePointerCapture(e.pointerId); } catch (err) { /* 既に解放済み */ }
+    persist();
+  }
+  glCanvas.addEventListener('pointerup', endDrag);
+  glCanvas.addEventListener('pointercancel', endDrag);
+  glCanvas.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    state.view.dist = Math.max(22, Math.min(110, state.view.dist * (1 + Math.sign(e.deltaY) * 0.1)));
+  }, { passive: false });
+
+  function syncViewButtons() {
+    document.getElementById('autoBtn').classList.toggle('on', state.view.auto);
+    document.getElementById('insideBtn').classList.toggle('on', state.view.inside);
+  }
+  document.getElementById('autoBtn').addEventListener('click', function () {
+    state.view.auto = !state.view.auto; syncViewButtons(); persist();
+  });
+  document.getElementById('insideBtn').addEventListener('click', function () {
+    state.view.inside = !state.view.inside; syncViewButtons(); persist();
+  });
+  document.getElementById('viewResetBtn').addEventListener('click', function () {
+    state.view.az = 0.6; state.view.el = 0.12; state.view.dist = 46; state.view.inside = false;
+    syncViewButtons(); persist();
+  });
+
+  var lastT = 0;
+  function loop(t) {
+    var dt = lastT ? Math.min(0.05, (t - lastT) / 1000) : 0;
+    lastT = t;
+    if (state.view.auto && !dragging) state.view.az += dt * 0.35;
+    renderGL();
+    requestAnimationFrame(loop);
+  }
+
+  /* =======================================================================
+   * 展開図(マス目)の描画と操作
+   * ======================================================================= */
+  var chart = document.getElementById('chartCanvas');
+  var cctx = chart.getContext('2d');
+  var chartGeom = null;
+
+  function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  function drawChart() {
+    var S = state.gridS, R = state.gridR;
+    var padL = 42, padR = 42, padT = 34, padB = 26;
+    var cellW = 40, cellH = 32;
+    var W = padL + padR + S * cellW;
+    var H = padT + padB + R * cellH;
+    if (chart.width !== W || chart.height !== H) { chart.width = W; chart.height = H; }
+    chart.style.minWidth = Math.min(W, 1200) + 'px';
+    chartGeom = { padL: padL, padT: padT, cellW: cellW, cellH: cellH, W: W, H: H };
+
+    var ink = cssVar('--ink') || '#19221e';
+    var muted = cssVar('--muted') || '#5d685a';
+    var line = cssVar('--line') || '#ccd0bd';
+    var surface = cssVar('--surface') || '#fff';
+
+    cctx.clearRect(0, 0, W, H);
+    cctx.fillStyle = surface;
+    cctx.fillRect(0, 0, W, H);
+
+    var gx = padL, gy = padT, gw = S * cellW, gh = R * cellH;
+
+    // マス目本体。数式モードは数式の結果、マス目モードは塗ったデータ、
+    // 三角マス目モードは対角線で2色に分けて描く
+    var N = state.colors.length;
+    var pat = state.mode === 'formula' ? resolvePattern(formulaAppearance()) : null;
+    cctx.save();
+    for (var r = 0; r < R; r++) {
+      var cellY = gy + (R - 1 - r) * cellH; // r=0 が一番下の段(図面と同じ並び)
+      for (var c = 0; c < S; c++) {
+        var cellX = gx + c * cellW;
+        if (state.mode === 'triPaint') {
+          var tcell = state.triGrid[r][c];
+          var colA = BALLOON_COLORS[state.colors[Math.min(N - 1, tcell.a)]].ui;
+          var colB = BALLOON_COLORS[state.colors[Math.min(N - 1, tcell.b)]].ui;
+          // dir=0("\"): 左下(◣)がa・右上(◥)がb。dir=1("/"): 左上(◤)がa・右下(◢)がb
+          var pA, pB;
+          if (tcell.dir === 0) {
+            pA = [[cellX, cellY], [cellX, cellY + cellH], [cellX + cellW, cellY + cellH]];
+            pB = [[cellX, cellY], [cellX + cellW, cellY], [cellX + cellW, cellY + cellH]];
+          } else {
+            pA = [[cellX, cellY], [cellX, cellY + cellH], [cellX + cellW, cellY]];
+            pB = [[cellX + cellW, cellY], [cellX, cellY + cellH], [cellX + cellW, cellY + cellH]];
+          }
+          [[pA, colA], [pB, colB]].forEach(function (t) {
+            cctx.fillStyle = t[1];
+            cctx.beginPath();
+            cctx.moveTo(t[0][0][0], t[0][0][1]);
+            cctx.lineTo(t[0][1][0], t[0][1][1]);
+            cctx.lineTo(t[0][2][0], t[0][2][1]);
+            cctx.closePath();
+            cctx.fill();
+          });
+          cctx.strokeStyle = ink; cctx.lineWidth = 0.75;
+          cctx.beginPath();
+          if (tcell.dir === 0) { cctx.moveTo(cellX, cellY); cctx.lineTo(cellX + cellW, cellY + cellH); }
+          else { cctx.moveTo(cellX + cellW, cellY); cctx.lineTo(cellX, cellY + cellH); }
+          cctx.stroke();
+          continue;
+        }
+        var slot;
+        if (pat) {
+          var gv = (c + 0.5) * GORES / S;
+          var vv = 1 - (r + 0.5) / R;
+          slot = mod(pat.colorIndex(gv, vv, N), N);
+        } else {
+          slot = Math.min(N - 1, state.grid[r][c]);
+        }
+        cctx.fillStyle = BALLOON_COLORS[state.colors[slot]].ui;
+        cctx.fillRect(cellX, cellY, cellW, cellH);
+      }
+    }
+    cctx.restore();
+
+    // 格子線
+    cctx.strokeStyle = line;
+    cctx.lineWidth = 1;
+    cctx.beginPath();
+    for (var c2 = 0; c2 <= S; c2++) { cctx.moveTo(gx + c2 * cellW + 0.5, gy); cctx.lineTo(gx + c2 * cellW + 0.5, gy + gh); }
+    for (var r2 = 0; r2 <= R; r2++) { cctx.moveTo(gx, gy + r2 * cellH + 0.5); cctx.lineTo(gx + gw, gy + r2 * cellH + 0.5); }
+    cctx.stroke();
+
+    // 外枠
+    cctx.strokeStyle = ink; cctx.lineWidth = 1.5;
+    cctx.strokeRect(gx + 0.5, gy + 0.5, gw, gh);
+
+    // ラベル(上=列番号、左右=段番号。図面と同じ配置)
+    cctx.fillStyle = muted;
+    cctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
+    cctx.textAlign = 'center'; cctx.textBaseline = 'middle';
+    for (var c3 = 0; c3 < S; c3++) cctx.fillText(String(c3 + 1), gx + c3 * cellW + cellW / 2, gy - 12);
+    for (var r3 = 0; r3 < R; r3++) {
+      var yy = gy + (R - 1 - r3) * cellH + cellH / 2;
+      cctx.fillText(String(r3 + 1), gx - 18, yy);
+      cctx.fillText(String(r3 + 1), gx + gw + 18, yy);
+    }
+    cctx.textAlign = 'left';
+    cctx.fillText(t('chart.topLabel'), gx, gy - 26);
+    cctx.fillText(t('chart.bottomLabel'), gx, gy + gh + 14);
+  }
+
+  function cellFromEvent(e) {
+    if (!chartGeom) return null;
+    var rect = chart.getBoundingClientRect();
+    var sx = chart.width / rect.width, sy = chart.height / rect.height;
+    var x = (e.clientX - rect.left) * sx, y = (e.clientY - rect.top) * sy;
+    var cf = (x - chartGeom.padL) / chartGeom.cellW;
+    var rf = (y - chartGeom.padT) / chartGeom.cellH;
+    var c = Math.floor(cf);
+    var rTop = Math.floor(rf);
+    if (c < 0 || c >= state.gridS || rTop < 0 || rTop >= state.gridR) return null;
+    // lu: セル内の左右位置(0=左端,1=右端)。lv: セル内の上下位置(0=下端,1=上端)。
+    // 三角マス目でどちら側をクリックしたか(対角線のa/b側)を見るために使う
+    return { c: c, r: state.gridR - 1 - rTop, lu: cf - c, lv: 1 - (rf - rTop) };
+  }
+
+  var painting = false;
+  function paintAt(e) {
+    var cell = cellFromEvent(e);
+    if (!cell) return;
+    if (state.grid[cell.r][cell.c] === state.paintSlot) return;
+    state.grid[cell.r][cell.c] = state.paintSlot;
+    refreshAfterPatternChange();
+  }
+  // 三角マス目: 'paint'ツールはクリックした側だけを塗る。'flip'ツールは
+  // 対角線を反転する(ドラッグで何度も反転してしまわないよう、1回の
+  // ポインタ操作で1マス1回だけに留める)
+  var flippedThisGesture = null;
+  function triPaintAt(e) {
+    var cell = cellFromEvent(e);
+    if (!cell) return;
+    var tcell = state.triGrid[cell.r][cell.c];
+    if (state.triTool === 'flip') {
+      var key = cell.r + ',' + cell.c;
+      if (flippedThisGesture.has(key)) return;
+      flippedThisGesture.add(key);
+      tcell.dir = tcell.dir ? 0 : 1;
+    } else {
+      var sideA = tcell.dir === 0 ? (cell.lu + cell.lv < 1) : (cell.lv > cell.lu);
+      if (sideA) { if (tcell.a === state.paintSlot) return; tcell.a = state.paintSlot; }
+      else { if (tcell.b === state.paintSlot) return; tcell.b = state.paintSlot; }
+    }
+    refreshAfterPatternChange();
+  }
+  chart.addEventListener('pointerdown', function (e) {
+    if (state.mode !== 'paint' && state.mode !== 'triPaint') return;
+    painting = true;
+    beginGesture(); // 一塗り(ドラッグ)ぶんを1回のUndo単位にする
+    flippedThisGesture = new Set();
+    chart.setPointerCapture(e.pointerId);
+    if (state.mode === 'triPaint') triPaintAt(e); else paintAt(e);
+  });
+  chart.addEventListener('pointermove', function (e) {
+    if (!painting) return;
+    if (state.mode === 'triPaint') triPaintAt(e); else paintAt(e);
+  });
+  function endPaint(e) {
+    if (!painting) return;
+    painting = false;
+    flippedThisGesture = null;
+    try { chart.releasePointerCapture(e.pointerId); } catch (err) { /* 既に解放済み */ }
+    endGesture();
+    persist();
+  }
+  chart.addEventListener('pointerup', endPaint);
+  chart.addEventListener('pointercancel', endPaint);
+
+  document.getElementById('fromFormula').addEventListener('click', function () {
+    snapshotNow();
+    state.grid = gridFromPattern(state.gridS, state.gridR, resolvePattern(formulaAppearance()), state.colors.length);
+    syncAll();
+  });
+  document.getElementById('clearGrid').addEventListener('click', function () {
+    snapshotNow();
+    state.grid = newGrid(state.gridS, state.gridR, 0);
+    syncAll();
+  });
+  document.getElementById('loadSapphire').addEventListener('click', function () {
+    snapshotNow();
+    state.gridS = 24; state.gridR = PATTERNS.sapphire.rows;
+    state.colors = [8, 6, 1, 12];
+    state.grid = gridFromPattern(24, PATTERNS.sapphire.rows, PATTERNS.sapphire, 4);
+    state.mode = 'paint';
+    state.paintSlot = 0;
+    syncAll();
+  });
+
+  Array.prototype.forEach.call(document.getElementById('triToolSeg').children, function (b) {
+    b.addEventListener('click', function () { state.triTool = b.dataset.tool; syncAll(); });
+  });
+  document.getElementById('triFromGrid').addEventListener('click', function () {
+    snapshotNow();
+    state.triGrid = triGridFromGrid(state.grid);
+    syncAll();
+  });
+  document.getElementById('triClearGrid').addEventListener('click', function () {
+    snapshotNow();
+    state.triGrid = newTriGrid(state.gridS, state.gridR);
+    syncAll();
+  });
+
+  /* =======================================================================
+   * UI 組み立て
+   * ======================================================================= */
+  var langSelect = document.getElementById('langSelect');
+  LANGS.forEach(function (l) {
+    var o = document.createElement('option');
+    o.value = l.code; o.textContent = l.label;
+    langSelect.appendChild(o);
+  });
+  langSelect.value = currentLang;
+  langSelect.addEventListener('change', function () {
+    currentLang = langSelect.value;
+    try { localStorage.setItem(LANG_KEY, currentLang); } catch (e) { /* 保存できなくても続行 */ }
+    // data-i18n系属性を持つ要素(静的HTML・動的生成の両方)をまとめて貼り替えてから、
+    // t()を直接呼んで組み立てるヒント・トースト類をsyncAll()で再構築する
+    applyI18n();
+    syncAll();
+  });
+
+  var modeSeg = document.getElementById('modeSeg');
+  Array.prototype.forEach.call(modeSeg.children, function (b) {
+    b.addEventListener('click', function () { snapshotNow(); state.mode = b.dataset.mode; syncAll(); });
+  });
+
+  var patternSeg = document.getElementById('patternSeg');
+  PATTERN_IDS.concat([CUSTOM_PATTERN]).forEach(function (id) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.pattern = id;
+    b.dataset.i18n = id === CUSTOM_PATTERN ? 'pattern.custom' : 'pattern.' + id;
+    b.textContent = t(b.dataset.i18n);
+    b.addEventListener('click', function () { snapshotNow(); state.pattern = id; syncAll(); });
+    patternSeg.appendChild(b);
+  });
+
+  var PRESET_SEED = {
+    alt: { slices: 16, kv: 0, kg: 16, waveAmp: 0, wavePeriods: 0, checker: false, mapping: 'cycle' },
+    horizontal: { slices: 16, kv: 10, kg: 0, waveAmp: 0, wavePeriods: 0, checker: false, mapping: 'cycle' },
+    spiral: { slices: 16, kv: 9, kg: 'N', waveAmp: 0, wavePeriods: 0, checker: false, mapping: 'cycle' },
+    sapphire: { slices: 24, kv: 13, kg: 0, waveAmp: 2, wavePeriods: 3, checker: true, mapping: 'zoneChecker' },
+  };
+  var PRESET_CAVEAT_KEY = {
+    alt: null, horizontal: null,
+    spiral: 'preset.caveatSpiral',
+    sapphire: 'preset.caveatSapphire',
+  };
+
+  function renderPresetNote() {
+    var box = document.getElementById('presetNote');
+    if (state.pattern === CUSTOM_PATTERN) { box.style.display = 'none'; box.innerHTML = ''; return; }
+    box.style.display = 'block';
+    var key = PRESET_CAVEAT_KEY[state.pattern];
+    box.textContent = key ? t(key) : t('preset.caveatDefault');
+    var btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'btn ghost'; btn.style.marginTop = '8px';
+    btn.textContent = t('preset.startFromHere');
+    btn.addEventListener('click', function () {
+      snapshotNow();
+      state.kernel = Object.assign({}, PRESET_SEED[state.pattern]);
+      state.pattern = CUSTOM_PATTERN;
+      syncAll();
+    });
+    box.appendChild(btn);
+  }
+
+  var kvSlider = document.getElementById('kvSlider'), kvNum = document.getElementById('kvNum');
+  kvSlider.addEventListener('input', function () { beginGesture(); state.kernel.kv = Number(kvSlider.value); syncAll(); });
+  kvSlider.addEventListener('change', function () { endGesture(); });
+  kvNum.addEventListener('change', function () {
+    snapshotNow();
+    state.kernel.kv = clampInt(Number(kvNum.value) || 0, 0, KERNEL_KV_MAX);
+    syncAll();
+  });
+
+  function kgI18nKey(v) {
+    if (v === 'N') return 'kg.n';
+    if (v === '-N') return 'kg.nNeg';
+    if (v === 0) return 'kg.zero';
+    return null;
+  }
+  function kgLabel(v) {
+    var key = kgI18nKey(v);
+    if (key) return t(key);
+    return v > 0 ? '+' + v : String(v);
+  }
+  var kgSelect = document.getElementById('kgSelect');
+  KERNEL_KG_VALUES.forEach(function (v, i) {
+    var o = document.createElement('option');
+    o.value = String(i);
+    var key = kgI18nKey(v);
+    if (key) { o.dataset.i18n = key; o.textContent = t(key); } else { o.textContent = kgLabel(v); }
+    kgSelect.appendChild(o);
+  });
+  kgSelect.addEventListener('change', function () {
+    snapshotNow();
+    state.kernel.kg = KERNEL_KG_VALUES[Number(kgSelect.value)];
+    syncAll();
+  });
+
+  // labelKey(v) がnullを返す値(数値そのもの)はdata-i18nを付けず、そのまま表示する
+  // (数字はどの言語でも同じ表記でよいため)
+  function fillSeg(el, values, labelKey, onPick) {
+    values.forEach(function (v) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.dataset.v = String(v);
+      var key = labelKey(v);
+      if (key) { b.dataset.i18n = key; b.textContent = t(key); } else { b.textContent = String(v); }
+      b.addEventListener('click', function () { snapshotNow(); onPick(v); syncAll(); });
+      el.appendChild(b);
+    });
+  }
+  fillSeg(document.getElementById('mappingSeg'), KERNEL_MAPPINGS, function (m) { return 'mapping.' + m; },
+    function (m) { state.kernel.mapping = m; });
+  fillSeg(document.getElementById('waveNSeg'), KERNEL_WAVE_PERIODS, function (p) { return p === 0 ? 'wave.none' : null; },
+    function (p) { state.kernel.wavePeriods = p; });
+  fillSeg(document.getElementById('waveASeg'), [0, 1, 2, 3], function (a) { return a === 0 ? 'wave.none' : null; },
+    function (a) { state.kernel.waveAmp = a; });
+  document.getElementById('checkerBox').addEventListener('change', function (e) {
+    snapshotNow();
+    state.kernel.checker = e.target.checked;
+    syncAll();
+  });
+
+  var gridSSelect = document.getElementById('gridSSelect');
+  KERNEL_SLICES.forEach(function (s) {
+    var o = document.createElement('option'); o.value = String(s); o.textContent = String(s);
+    gridSSelect.appendChild(o);
+  });
+  gridSSelect.addEventListener('change', function () { resizeGrid(Number(gridSSelect.value), state.gridR); });
+
+  var gridRSelect = document.getElementById('gridRSelect');
+  for (var rr = 4; rr <= 24; rr++) {
+    var o = document.createElement('option'); o.value = String(rr); o.textContent = String(rr);
+    gridRSelect.appendChild(o);
+  }
+  gridRSelect.addEventListener('change', function () { resizeGrid(state.gridS, Number(gridRSelect.value)); });
+
+  // 列や段を変えても、いま塗ってあるマスをできるだけ引き継ぐ
+  function resizeGrid(S, R) {
+    snapshotNow();
+    var old = state.grid, oldS = state.gridS, oldR = state.gridR;
+    var oldTri = state.triGrid;
+    var g = newGrid(S, R, 0);
+    var tg = newTriGrid(S, R);
+    for (var r = 0; r < R; r++) {
+      for (var c = 0; c < S; c++) {
+        var or = Math.min(oldR - 1, Math.floor(r * oldR / R));
+        var oc = Math.min(oldS - 1, Math.floor(c * oldS / S));
+        g[r][c] = old[or][oc];
+        tg[r][c] = Object.assign({}, oldTri[or][oc]); // セルを共有しない(独立にコピー)
+      }
+    }
+    state.gridS = S; state.gridR = R; state.grid = g; state.triGrid = tg;
+    state.kernel.slices = KERNEL_SLICES.indexOf(S) >= 0 ? S : state.kernel.slices;
+    syncAll();
+  }
+
+  /* ---- 配色 ---- */
+  document.getElementById('addSlot').addEventListener('click', function () {
+    if (state.colors.length >= MAX_COLORS) return;
+    snapshotNow();
+    state.colors.push((state.colors[state.colors.length - 1] + 1) % BALLOON_COLORS.length);
+    state.paintSlot = state.colors.length - 1;
+    syncAll();
+  });
+  document.getElementById('removeSlot').addEventListener('click', function () {
+    if (state.colors.length <= 1) return;
+    snapshotNow();
+    var removed = state.paintSlot;
+    state.colors.splice(removed, 1);
+    function shift(slot) { return slot > removed ? slot - 1 : (slot === removed ? 0 : slot); }
+    for (var r = 0; r < state.gridR; r++) {
+      for (var c = 0; c < state.gridS; c++) {
+        state.grid[r][c] = shift(state.grid[r][c]);
+        var tcell = state.triGrid[r][c];
+        tcell.a = shift(tcell.a);
+        tcell.b = shift(tcell.b);
+      }
+    }
+    state.paintSlot = Math.min(state.paintSlot, state.colors.length - 1);
+    syncAll();
+  });
+
+  function renderSlots() {
+    var strip = document.getElementById('slotStrip');
+    strip.innerHTML = '';
+    state.colors.forEach(function (colIdx, i) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'slot-chip' + (i === state.paintSlot ? ' sel' : '');
+      b.innerHTML = '<span class="dot" style="background:' + BALLOON_COLORS[colIdx].ui + '"></span>'
+        + '<span class="num-badge">' + (i + 1) + '</span>'
+        + '<span>' + colorLabel(colIdx) + '</span>';
+      b.addEventListener('click', function () { state.paintSlot = i; syncAll(); });
+      strip.appendChild(b);
+    });
+
+    var detail = document.getElementById('slotDetail');
+    var paintingNote = state.mode === 'paint' || (state.mode === 'triPaint' && state.triTool === 'paint') ? t('slot.paintingNote') : '';
+    detail.innerHTML = '<div style="font-size:12.5px">' + t('slot.detailLabel', { n: state.paintSlot + 1 })
+      + '<span class="hint" style="margin-left:6px">' + paintingNote + '</span></div>';
+    var sw = document.createElement('div');
+    sw.className = 'swatches';
+    BALLOON_COLORS.forEach(function (c, i) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'swatch' + (i === state.colors[state.paintSlot] ? ' selected' : '');
+      var label = colorLabel(i);
+      btn.style.background = c.ui; btn.title = label; btn.setAttribute('aria-label', label);
+      btn.addEventListener('click', function () { snapshotNow(); state.colors[state.paintSlot] = i; syncAll(); });
+      sw.appendChild(btn);
+    });
+    detail.appendChild(sw);
+
+    var n = state.colors.length;
+    document.getElementById('capNote').textContent = n <= 4 ? t('cap.le4') : t('cap.gt4', { n: n });
+    document.getElementById('addSlot').disabled = n >= MAX_COLORS;
+    document.getElementById('removeSlot').disabled = n <= 1;
+    document.getElementById('soloFillRow').style.display = n === 1 ? 'flex' : 'none';
+  }
+
+  document.getElementById('soloFill').addEventListener('change', function (e) {
+    snapshotNow();
+    state.soloFill = e.target.checked;
+    syncAll();
+  });
+  document.getElementById('tapeSelect').addEventListener('change', function (e) {
+    snapshotNow();
+    state.tape = e.target.value;
+    syncAll();
+  });
+
+  /* ---- 参考画像の窓 ----
+   * 展開図に重ねるのではなく、独立した窓に出して見比べる方式。
+   * ドラッグで移動、右下つまみで大きさ変更、±で拡大縮小できる */
+  var refWin = document.getElementById('refWindow');
+  var refWinBody = document.getElementById('refWinBody');
+  var refImgEl = null;
+
+  function placeRefWindow() {
+    if (state.ref.x === null) {
+      state.ref.x = Math.max(12, window.innerWidth - state.ref.w - 28);
+      state.ref.y = 90;
+    }
+    var maxX = Math.max(0, window.innerWidth - 120);
+    var maxY = Math.max(0, window.innerHeight - 60);
+    refWin.style.left = Math.min(maxX, Math.max(0, state.ref.x)) + 'px';
+    refWin.style.top = Math.min(maxY, Math.max(0, state.ref.y)) + 'px';
+    refWin.style.width = state.ref.w + 'px';
+    refWin.style.height = state.ref.h + 'px';
+  }
+
+  function syncRefWindow() {
+    refWin.classList.toggle('open', !!state.ref.open);
+    document.getElementById('refOpen').disabled = !refImgEl;
+    document.getElementById('refOpen').textContent = state.ref.open ? t('ref.closeBtn') : t('ref.openBtn');
+    document.getElementById('refZoomVal').textContent = state.ref.zoom + '%';
+    document.getElementById('refWinEmpty').style.display = refImgEl ? 'none' : 'block';
+    if (refImgEl) refImgEl.style.transform = 'scale(' + state.ref.zoom / 100 + ')';
+    if (state.ref.open) placeRefWindow();
+  }
+
+  document.getElementById('refFile').addEventListener('change', function (e) {
+    var file = e.target.files && e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var img = new Image();
+      img.alt = file.name;
+      img.onload = function () {
+        if (refImgEl) refImgEl.remove();
+        refImgEl = img;
+        refWinBody.appendChild(img);
+        document.getElementById('refWinTitle').textContent = file.name;
+        // 窓の幅に収まる倍率から始める
+        state.ref.zoom = Math.max(10, Math.min(100, Math.round((state.ref.w - 20) / img.naturalWidth * 100)));
+        state.ref.open = true;
+        syncAll();
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  document.getElementById('refOpen').addEventListener('click', function () {
+    state.ref.open = !state.ref.open; syncAll();
+  });
+  document.getElementById('refWinClose').addEventListener('click', function () {
+    state.ref.open = false; syncAll();
+  });
+  document.getElementById('refZoomIn').addEventListener('click', function () {
+    state.ref.zoom = Math.min(400, state.ref.zoom + 20); syncAll();
+  });
+  document.getElementById('refZoomOut').addEventListener('click', function () {
+    state.ref.zoom = Math.max(10, state.ref.zoom - 20); syncAll();
+  });
+  document.getElementById('refZoomVal').addEventListener('click', function () {
+    state.ref.zoom = 100; syncAll();
+  });
+
+  // タイトルバーをつかんで窓を動かす
+  var winDrag = null;
+  document.getElementById('refWinBar').addEventListener('pointerdown', function (e) {
+    if (e.target.tagName === 'BUTTON') return;
+    winDrag = { dx: e.clientX - state.ref.x, dy: e.clientY - state.ref.y };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  });
+  document.getElementById('refWinBar').addEventListener('pointermove', function (e) {
+    if (!winDrag) return;
+    state.ref.x = e.clientX - winDrag.dx;
+    state.ref.y = e.clientY - winDrag.dy;
+    placeRefWindow();
+  });
+  function endWinDrag(e) {
+    if (!winDrag) return;
+    winDrag = null;
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (err) { /* 解放済み */ }
+    persist();
+  }
+  document.getElementById('refWinBar').addEventListener('pointerup', endWinDrag);
+  document.getElementById('refWinBar').addEventListener('pointercancel', endWinDrag);
+
+  // CSSのresizeで変えた大きさを覚えておく
+  if (window.ResizeObserver) {
+    new ResizeObserver(function () {
+      if (!state.ref.open) return;
+      state.ref.w = refWin.offsetWidth;
+      state.ref.h = refWin.offsetHeight;
+    }).observe(refWin);
+  }
+
+  /* ---- コピー ---- */
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch (e) { /* 手動コピーは可能 */ }
+    document.body.removeChild(ta);
+  }
+  function wireCopy(btnId, getText, msgId) {
+    document.getElementById(btnId).addEventListener('click', function () {
+      var text = getText();
+      var el = document.getElementById(msgId);
+      var done = function () {
+        var msg = t('copy.done');
+        el.textContent = msg;
+        setTimeout(function () { if (el.textContent === msg) el.textContent = ''; }, 1800);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text); done(); });
+      } else { fallbackCopy(text); done(); }
+    });
+  }
+  wireCopy('copyCode', function () { return document.getElementById('codeOut').value; }, 'copyMsg');
+  wireCopy('copySnippet', function () { return document.getElementById('snippet').textContent; }, 'copySnippetMsg');
+
+  /* ---- 書き出しの中身 ---- */
+  // balloon-appearance.js へプリセットとして足すための下書き。
+  // makeGridPattern() が用意されているので、マス目の配列を渡すだけで済む
+  function gridSnippet(period) {
+    var p = period || state.gridS;
+    var lines = [];
+    lines.push('// 展開図 ' + state.gridS + '列 × ' + state.gridR + '段');
+    if (p < state.gridS) {
+      lines.push('// (横は' + p + '列ぶんだけ持ち、' + (state.gridS / p) + '回繰り返して' + state.gridS + '列にする)');
+    }
+    lines.push('// 行は下から上へ。値は色スロット番号(実際のパレット番号ではない)');
+    lines.push('const MY_BALLOON_ROWS = [');
+    for (var r = 0; r < state.gridR; r++) lines.push('  [' + state.grid[r].slice(0, p).join(', ') + '],');
+    lines.push('];');
+    lines.push('');
+    lines.push('// PATTERN_IDS の末尾に \'myBalloon\' を足し、PATTERNS に次を追加する');
+    lines.push("myBalloon: makeGridPattern('myBalloon', " + state.gridS + ', MY_BALLOON_ROWS),');
+    lines.push('');
+    lines.push('// 既定の配色は下から: ' + state.colors.map(function (c, i) {
+      return (i + 1) + '=' + BALLOON_COLORS[c].name;
+    }).join(' / '));
+    return lines.join('\n');
+  }
+
+  // 三角マス目版のプリセット下書き。makeTriGridPattern()が用意されているので、
+  // gridSnippet()と同じ形で{a,b,dir}の配列を渡すだけで済む
+  function triGridSnippet(period) {
+    var p = period || state.gridS;
+    var lines = [];
+    lines.push('// 展開図(三角パネル) ' + state.gridS + '列 × ' + state.gridR + '段');
+    if (p < state.gridS) {
+      lines.push('// (横は' + p + '列ぶんだけ持ち、' + (state.gridS / p) + '回繰り返して' + state.gridS + '列にする)');
+    }
+    lines.push('// 行は下から上へ。各マスは{a,b,dir}(dir=0:「\\」でa=左下・b=右上、dir=1:「/」でa=左上・b=右下)');
+    lines.push('const MY_BALLOON_TRI_ROWS = [');
+    for (var r = 0; r < state.gridR; r++) {
+      var cells = state.triGrid[r].slice(0, p).map(function (c) {
+        return '{ a: ' + c.a + ', b: ' + c.b + ', dir: ' + c.dir + ' }';
+      });
+      lines.push('  [' + cells.join(', ') + '],');
+    }
+    lines.push('];');
+    lines.push('');
+    lines.push('// PATTERN_IDS の末尾に \'myBalloonTri\' を足し、PATTERNS に次を追加する');
+    lines.push("myBalloonTri: makeTriGridPattern('myBalloonTri', " + state.gridS + ', MY_BALLOON_TRI_ROWS),');
+    lines.push('');
+    lines.push('// 既定の配色は下から: ' + state.colors.map(function (c, i) {
+      return (i + 1) + '=' + BALLOON_COLORS[c].name;
+    }).join(' / '));
+    return lines.join('\n');
+  }
+
+  function updateExport() {
+    var codeOut = document.getElementById('codeOut');
+    var pill = document.getElementById('formatPill');
+    var lenHint = document.getElementById('lenHint');
+    var codeNote = document.getElementById('codeNote');
+    var snippetTitle = document.getElementById('snippetTitle');
+    var snippet = document.getElementById('snippet');
+    var copyBtn = document.getElementById('copyCode');
+
+    // 符号化そのものはencodeAppearance()(balloon-appearance.js)に一本化する。
+    // v0〜v4のどれになるか・マス目コードでv3/v4どちらが短いかの判断も含めて、
+    // ゲーム側と全く同じ結果になる
+    var app = currentAppearance();
+    var code = encodeAppearance(app);
+    var fits = code.length <= MAX_CODE_LENGTH;
+    codeOut.value = code;
+
+    var isV0 = /^[0-9A-F]{6}$/.test(code);
+    var prefix = code[0];
+    var labelKey = isV0 ? 'export.formatV0'
+      : prefix === 'H' ? 'export.gridFormat2'
+        : prefix === 'J' ? 'export.gridFormatTri3'
+          : prefix === 'K' ? 'export.gridFormatTri4'
+            : 'export.formatV1';
+    pill.textContent = fits ? t(labelKey) : t('export.tooLong');
+    pill.className = 'pill ' + (fits ? (isV0 ? 'v0' : 'v1') : 'none');
+    lenHint.textContent = t('export.charCount', { n: code.length });
+    codeNote.textContent = fits
+      ? (state.mode === 'formula' ? t('export.codeNoteFormula') : t('export.fitsNote'))
+      : t('export.tooLongNote', { max: MAX_CODE_LENGTH });
+    copyBtn.disabled = !fits;
+
+    if (state.mode === 'paint' || state.mode === 'triPaint') {
+      var isTri = state.mode === 'triPaint';
+      var period = isTri ? horizontalPeriodTri(state.triGrid, state.gridS) : horizontalPeriod(state.grid, state.gridS);
+      snippetTitle.textContent = t('export.snippetTitlePreset');
+      snippet.textContent = isTri ? triGridSnippet(period) : gridSnippet(period);
+      return;
+    }
+
+    snippetTitle.textContent = t('export.snippetTitleParams');
+    // 下書きコード自体は balloon-appearance.js(日本語コメント統一)へ貼り付ける
+    // ためのものなので、UI言語に関わらずコメントは常に日本語のまま出す
+    snippet.textContent = state.pattern === CUSTOM_PATTERN
+      ? JSON.stringify(clampKernelUI(state.kernel), null, 2).replace(/"([a-zA-Z]+)":/g, '$1:')
+      : '// ' + PATTERN_LABEL[state.pattern] + ' は実装済みのプリセットです。\n'
+        + '// balloon-appearance.js の PATTERNS.' + state.pattern + ' を参照してください。';
+  }
+
+  function updateReadout() {
+    var parts = [];
+    var patternLabel = state.mode === 'paint' ? t('readout.patternPaint')
+      : state.mode === 'triPaint' ? t('readout.patternTriPaint')
+        : (state.pattern === CUSTOM_PATTERN ? t('pattern.custom') : t('pattern.' + state.pattern));
+    parts.push(t('readout.pattern') + '=<b>' + patternLabel + '</b>');
+    parts.push(t('readout.colorCount') + '=<b>' + state.colors.length + '</b>');
+    parts.push(t('readout.grid') + '=<b>' + state.gridS + '×' + state.gridR + '</b>');
+    if (state.mode === 'formula' && state.pattern === CUSTOM_PATTERN) {
+      var k = clampKernelUI(state.kernel);
+      parts.push('Kv=<b>' + k.kv + '</b>');
+      parts.push('Kg=<b>' + kgLabel(k.kg) + '</b>');
+    }
+    document.getElementById('readout').innerHTML = parts.map(function (p) { return '<span>' + p + '</span>'; }).join('');
+  }
+
+  // スカートの色ルール(既定=1色目/柄によっては最後に追加した色)は使う人から
+  // 見えづらいため、いま効いているルールを配色欄の下に常に表示しておく
+  function updateSkirtHint() {
+    var pat = activePattern();
+    var useTop = !!pat.skirtUsesTopColor && state.colors.length > 1;
+    document.getElementById('skirtHint').innerHTML = useTop
+      ? t('skirt.hintTop', { n: state.colors.length })
+      : t('skirt.hintDefault');
+  }
+
+  function refreshAfterPatternChange() {
+    buildGoreTexture();
+    uploadTexture();
+    drawChart();
+    updateExport();
+    updateReadout();
+  }
+
+  function syncAll() {
+    state.kernel = clampKernelUI(state.kernel);
+    if (state.colors.length < 1) state.colors = [0];
+    state.paintSlot = clampInt(state.paintSlot, 0, state.colors.length - 1);
+    // gridS/gridRだけを直接書き換える経路(loadSapphire等)があっても、
+    // triGridの寸法がずれたまま描画で落ちないように毎回揃えておく
+    if (!state.triGrid || state.triGrid.length !== state.gridR || state.triGrid[0].length !== state.gridS) {
+      state.triGrid = triGridFromGrid(state.grid);
+    }
+
+    Array.prototype.forEach.call(modeSeg.children, function (b) {
+      b.classList.toggle('active', b.dataset.mode === state.mode);
+    });
+    document.getElementById('modeHint').textContent = state.mode === 'paint'
+      ? t('mode.hintPaint')
+      : state.mode === 'triPaint'
+        ? t('mode.hintTriPaint')
+        : t('mode.hintFormula');
+
+    var isFormula = state.mode === 'formula';
+    var isTriPaint = state.mode === 'triPaint';
+    document.getElementById('presetField').style.display = isFormula ? 'block' : 'none';
+    document.getElementById('kernelField').style.display = (isFormula && state.pattern === CUSTOM_PATTERN) ? 'block' : 'none';
+    document.getElementById('paintTools').style.display = (state.mode === 'paint') ? 'block' : 'none';
+    document.getElementById('triPaintTools').style.display = isTriPaint ? 'block' : 'none';
+    document.getElementById('paintHelp').textContent = isFormula
+      ? t('mode.paintHelpFormula') : '';
+    chart.classList.toggle('painting', !isFormula);
+
+    Array.prototype.forEach.call(document.getElementById('triToolSeg').children, function (b) {
+      b.classList.toggle('active', b.dataset.tool === state.triTool);
+    });
+
+    Array.prototype.forEach.call(patternSeg.children, function (b) {
+      b.classList.toggle('active', b.dataset.pattern === state.pattern);
+    });
+    renderPresetNote();
+
+    kvSlider.value = state.kernel.kv; kvNum.value = state.kernel.kv;
+    kgSelect.value = String(KERNEL_KG_VALUES.indexOf(state.kernel.kg));
+    Array.prototype.forEach.call(document.getElementById('mappingSeg').children, function (b) {
+      b.classList.toggle('active', b.dataset.v === state.kernel.mapping);
+    });
+    Array.prototype.forEach.call(document.getElementById('waveNSeg').children, function (b) {
+      b.classList.toggle('active', Number(b.dataset.v) === state.kernel.wavePeriods);
+    });
+    Array.prototype.forEach.call(document.getElementById('waveASeg').children, function (b) {
+      b.classList.toggle('active', Number(b.dataset.v) === state.kernel.waveAmp);
+    });
+    document.getElementById('checkerBox').checked = state.kernel.checker;
+    document.getElementById('mappingHint').textContent = t('mappingHint.' + state.kernel.mapping);
+
+    gridSSelect.value = String(state.gridS);
+    gridRSelect.value = String(state.gridR);
+
+    renderSlots();
+    document.getElementById('soloFill').checked = state.soloFill;
+    document.getElementById('tapeSelect').value = state.tape;
+
+    syncRefWindow();
+
+    var legend = document.getElementById('chartLegend');
+    legend.innerHTML = state.colors.map(function (ci, i) {
+      return '<span><span class="slot-swatch-dot" style="display:inline-block;width:11px;height:11px;border-radius:3px;'
+        + 'background:' + BALLOON_COLORS[ci].ui + ';margin-right:5px;vertical-align:-1px"></span>'
+        + t('chart.legendItem', { n: i + 1, name: colorLabel(ci) }) + '</span>';
+    }).join('');
+
+    updateSkirtHint();
+    syncViewButtons();
+    refreshAfterPatternChange();
+    persist();
+  }
+
+  /* =======================================================================
+   * キーボードショートカット
+   * ↑↓: 選ぶ色スロット(色1/色2/…)を切り替える(選ぶだけなのでUndo対象外)
+   * ←→: いま選んでいるスロットに割り当てる色そのものを変える(Undo対象)
+   * Ctrl+Z / ⌘+Z: 元に戻す、Ctrl+Shift+Z(またはCtrl+Y): やり直す
+   * 入力欄(テキスト/数値/セレクト)にフォーカス中は既定の動作を優先して奪わない
+   * ======================================================================= */
+  document.addEventListener('keydown', function (e) {
+    var tag = (document.activeElement && document.activeElement.tagName) || '';
+    var typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+    var withMod = e.ctrlKey || e.metaKey;
+
+    if (withMod && (e.key === 'z' || e.key === 'Z')) {
+      e.preventDefault();
+      if (e.shiftKey) redo(); else undo();
+      return;
+    }
+    if (withMod && (e.key === 'y' || e.key === 'Y')) { e.preventDefault(); redo(); return; }
+    if (typing) return;
+
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      var n = state.colors.length;
+      state.paintSlot = mod(state.paintSlot + (e.key === 'ArrowUp' ? -1 : 1), n);
+      syncAll();
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      snapshotNow();
+      var m = BALLOON_COLORS.length;
+      state.colors[state.paintSlot] = mod(state.colors[state.paintSlot] + (e.key === 'ArrowLeft' ? -1 : 1), m);
+      syncAll();
+    }
+  });
+
+  /* ---- 起動 ---- */
+  applyI18n();
+  var glOk = false;
+  try { glOk = initGL(); } catch (e) {
+    glCanvas.style.display = 'none';
+    document.getElementById('glFallback').style.display = 'block';
+    document.getElementById('glFallback').textContent = t('preview.initError', { msg: e.message });
+  }
+  renderSavesList();
+  syncUndoButtons();
+  syncAll();
+  if (glOk) requestAnimationFrame(loop);
+  window.addEventListener('resize', function () { drawChart(); });
+})();
+</script>
+</body>
+</html>
