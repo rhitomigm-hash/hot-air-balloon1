@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { buildTerrain, lonLatToTile } from './terrain.js';
+import { buildBuildings } from './buildings.js';
 import { LANG, t, setLang, applyStaticI18n } from './i18n.js';
 import { Room, randomRoomCode, BALLOON_COLORS } from './net.js';
 import {
@@ -63,11 +64,11 @@ let AREA = null;       // { lon, lat, name? } エリア選択またはURLで決�
 
 // 日本の主な気球競技開催地(エリア選択のプリセット)
 const PRESET_AREAS = [
-  { name: t('area.saga'), lon: 130.25, lat: 33.27 },
-  { name: t('area.watarase'), lon: 139.68, lat: 36.22 },
-  { name: t('area.saku'), lon: 138.432328, lat: 36.248912 }, // 千曲川スポーツ交流広場
-  { name: t('area.ichinoseki'), lon: 141.13, lat: 38.93 },
-  { name: t('area.kamishihoro'), lon: 143.277865, lat: 43.237889 }, // 上士幌航空公園
+  { id: 'saga', name: t('area.saga'), lon: 130.25, lat: 33.27 },
+  { id: 'watarase', name: t('area.watarase'), lon: 139.68, lat: 36.22 },
+  { id: 'saku', name: t('area.saku'), lon: 138.432328, lat: 36.248912 }, // 千曲川スポーツ交流広場
+  { id: 'ichinoseki', name: t('area.ichinoseki'), lon: 141.13, lat: 38.93 },
+  { id: 'kamishihoro', name: t('area.kamishihoro'), lon: 143.277865, lat: 43.237889 }, // 上士幌航空公園
 ];
 
 // URLの ?a=lon,lat からエリアを復元
@@ -361,7 +362,46 @@ function toggleSound() {
   if (masterGain) masterGain.gain.setTargetAtTime(soundOn ? 1 : 0, audioCtx.currentTime, 0.05);
 }
 document.getElementById('sound-status').textContent = soundOn ? t('hud.soundOn') : t('hud.soundOff');
+
+// ---- 建物3D表示のオン/オフ(低スペック端末向け、既定OFF)。計器パネルの「建物」行、またはBキー ----
+// 初回ONの瞬間だけ非同期でデータ取得・ジオメトリ構築を行い(buildingsLayerにキャッシュ)、
+// 以降はgroup.visibleの切り替えのみで即時反映する
+const BUILDINGS_KEY = 'balloon-buildings';
+let buildingsOn = localStorage.getItem(BUILDINGS_KEY) === 'on';
+let buildingsLayer = null;
+let buildingsLoading = false;
+// terrain(下でconst宣言、地形読み込み完了まで未初期化)への参照はロード完了後まで安全でないため、
+// 計器パネル/Bキーがロード中にも操作できてしまうこの実装ではガードが要る
+let terrainReady = false;
+
+async function toggleBuildings() {
+  buildingsOn = !buildingsOn;
+  localStorage.setItem(BUILDINGS_KEY, buildingsOn ? 'on' : 'off');
+  document.getElementById('buildings-status').textContent =
+    buildingsOn ? t('hud.buildingsOn') : t('hud.buildingsOff');
+  await applyBuildingsVisibility();
+}
+
+async function applyBuildingsVisibility() {
+  if (!terrainReady) return; // 地形読み込み完了後、末尾の呼び出しで改めて反映される
+  if (!buildingsOn) {
+    if (buildingsLayer) buildingsLayer.setVisible(false);
+    return;
+  }
+  if (buildingsLayer) { buildingsLayer.setVisible(true); return; }
+  if (buildingsLoading) return;
+  buildingsLoading = true;
+  try {
+    buildingsLayer = await buildBuildings(AREA.id, terrain);
+    scene.add(buildingsLayer.group);
+  } finally {
+    buildingsLoading = false;
+  }
+}
+document.getElementById('buildings-status').textContent =
+  buildingsOn ? t('hud.buildingsOn') : t('hud.buildingsOff');
 document.getElementById('sound-row').addEventListener('click', toggleSound);
+document.getElementById('buildings-row').addEventListener('click', toggleBuildings);
 
 // 毎フレーム呼ばれ、入力状態・風速に音量を追従させる
 function updateSounds(windKt) {
@@ -435,6 +475,7 @@ addEventListener('keydown', (e) => {
   }
   if (e.code === 'KeyG' && started) reportGroundCrew();
   if (e.code === 'KeyS') toggleSound();
+  if (e.code === 'KeyB') toggleBuildings();
   if (e.code >= 'Digit1' && e.code <= 'Digit4') {
     setTimeScale([1, 2, 4, 8][Number(e.code.slice(5)) - 1]);
   }
@@ -693,6 +734,14 @@ if (MP_JOIN_CODE) {
   if (!AREA) AREA = await selectArea();
 }
 
+// プリセットエリアと一致する地点なら id を復元する(選択UI/マルチプレイのAREA受け渡しは
+// lon/lat/nameしか運ばないため。建物データ(buildings.js)はこのidでJSONを探す。
+// 一致しない = URLでのカスタム地点は、意図どおり建物データ無し(id未設定)のままになる
+if (!AREA.id) {
+  const preset = PRESET_AREAS.find((p) => Math.abs(p.lon - AREA.lon) < 1e-6 && Math.abs(p.lat - AREA.lat) < 1e-6);
+  if (preset) AREA.id = preset.id;
+}
+
 const loadingEl = document.getElementById('loading');
 document.getElementById('load-title').textContent =
   t('loading.area', { name: AREA.name || `${AREA.lat.toFixed(3)}N ${AREA.lon.toFixed(3)}E` });
@@ -702,7 +751,12 @@ const loadEl = document.getElementById('load-progress');
 const terrain = await buildTerrain(AREA.lon, AREA.lat, TILE_RADIUS,
   (done, total) => { loadEl.textContent = `${done} / ${total}`; });
 scene.add(terrain.group);
+terrainReady = true;
 loadingEl.remove();
+
+// 前回セッションでトグルがONのまま保存されていた場合、ここで初回ロードする
+// (デフォルトOFFのユーザーはこの非同期処理自体が走らず、ロード時間・メモリとも増えない)
+applyBuildingsVisibility();
 
 // ---- ブリーフィング(タスクシート+パイバル編集+離陸地点選択) ----
 setupWindEditor();

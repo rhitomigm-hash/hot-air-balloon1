@@ -164,6 +164,8 @@ const STR = {
     'btn.soundOn': '音 ON',
     'btn.soundOnStalled': '音 ON…',
     'btn.soundOff': '音 OFF',
+    'btn.buildingsOn': '建物 ON',
+    'btn.buildingsOff': '建物 OFF',
 
     'help.bodyHtml':
       '<b>Space</b> バーナー(長押し) <b>R</b> リップライン(長押し) <b>M</b> マーカー投下<br>' +
@@ -172,6 +174,7 @@ const STR = {
 
     'credit.aria': '出典を表示',
     'credit.html': '出典: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院 地理院タイル</a>(標高タイル・全国最新写真)',
+    'credit.buildingsHtml': '建物データ: <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">国土交通省 PLATEAU</a>(CC BY 4.0)/ <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors(ODbL)',
 
     'loading.generic': '地形を読み込み中…',
     'loading.area': '{name} の地形を読み込み中…',
@@ -390,6 +393,8 @@ const STR = {
     'btn.soundOn': 'Sound ON',
     'btn.soundOnStalled': 'Sound ON…',
     'btn.soundOff': 'Sound OFF',
+    'btn.buildingsOn': 'Buildings ON',
+    'btn.buildingsOff': 'Buildings OFF',
 
     'help.bodyHtml':
       '<b>Space</b> Burner (hold) <b>R</b> Rip line (hold) <b>M</b> Drop marker<br>' +
@@ -398,6 +403,7 @@ const STR = {
 
     'credit.aria': 'Show credits',
     'credit.html': 'Source: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">GSI (Geospatial Information Authority of Japan) tiles</a> (elevation tiles, latest aerial imagery)',
+    'credit.buildingsHtml': 'Building data: <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">MLIT PLATEAU</a> (CC BY 4.0) / <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors (ODbL)',
 
     'loading.generic': 'Loading terrain…',
     'loading.area': 'Loading terrain: {name}…',
@@ -618,6 +624,8 @@ const STR = {
     'btn.soundOn': 'Som LIGADO',
     'btn.soundOnStalled': 'Som LIGADO…',
     'btn.soundOff': 'Som DESLIGADO',
+    'btn.buildingsOn': 'Prédios LIGADO',
+    'btn.buildingsOff': 'Prédios DESLIGADO',
 
     'help.bodyHtml':
       '<b>Espaço</b> Queimador (segurar) <b>R</b> Respiro (segurar) <b>M</b> Lançar marcador<br>' +
@@ -626,6 +634,7 @@ const STR = {
 
     'credit.aria': 'Mostrar créditos',
     'credit.html': 'Fonte: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">Tiles do GSI (Instituto Geoespacial do Japão)</a> (tiles de elevação, imagens aéreas recentes)',
+    'credit.buildingsHtml': 'Dados de edifícios: <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">MLIT PLATEAU</a> (CC BY 4.0) / colaboradores do <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> (ODbL)',
 
     'loading.generic': 'Carregando terreno…',
     'loading.area': 'Carregando terreno: {name}…',
@@ -844,6 +853,8 @@ const STR = {
     'btn.soundOn': 'Dźwięk WŁ',
     'btn.soundOnStalled': 'Dźwięk WŁ…',
     'btn.soundOff': 'Dźwięk WYŁ',
+    'btn.buildingsOn': 'Budynki WŁ',
+    'btn.buildingsOff': 'Budynki WYŁ',
 
     'help.bodyHtml':
       '<b>Spacja</b> Palnik (przytrzymaj) <b>R</b> Odpowietrznik (przytrzymaj) <b>M</b> Zrzuć znacznik<br>' +
@@ -852,6 +863,7 @@ const STR = {
 
     'credit.aria': 'Pokaż źródła',
     'credit.html': 'Źródło: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">Kafelki GSI (Japoński Urząd Geoprzestrzenny)</a> (kafelki wysokościowe, najnowsze zdjęcia lotnicze)',
+    'credit.buildingsHtml': 'Dane budynków: <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">MLIT PLATEAU</a> (CC BY 4.0) / współtwórcy <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> (ODbL)',
 
     'loading.generic': 'Wczytywanie terenu…',
     'loading.area': 'Wczytywanie terenu: {name}…',
@@ -1070,6 +1082,8 @@ const STR = {
     'btn.soundOn': 'Son ACTIVÉ',
     'btn.soundOnStalled': 'Son ACTIVÉ…',
     'btn.soundOff': 'Son DÉSACTIVÉ',
+    'btn.buildingsOn': 'Bâtiments ACTIVÉS',
+    'btn.buildingsOff': 'Bâtiments DÉSACTIVÉS',
 
     'help.bodyHtml':
       '<b>Espace</b> Brûleur (maintenir) <b>R</b> Évent (maintenir) <b>M</b> Larguer le marqueur<br>' +
@@ -1078,6 +1092,7 @@ const STR = {
 
     'credit.aria': 'Afficher les crédits',
     'credit.html': 'Source : <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">Tuiles GSI (Institut géospatial du Japon)</a> (tuiles d\'élévation, imagerie aérienne récente)',
+    'credit.buildingsHtml': 'Données des bâtiments : <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">MLIT PLATEAU</a> (CC BY 4.0) / contributeurs <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> (ODbL)',
 
     'loading.generic': 'Chargement du terrain…',
     'loading.area': 'Chargement du terrain : {name}…',
@@ -1296,6 +1311,8 @@ const STR = {
     'btn.soundOn': 'Ton AN',
     'btn.soundOnStalled': 'Ton AN…',
     'btn.soundOff': 'Ton AUS',
+    'btn.buildingsOn': 'Gebäude AN',
+    'btn.buildingsOff': 'Gebäude AUS',
 
     'help.bodyHtml':
       '<b>Leertaste</b> Brenner (halten) <b>R</b> Ablassleine (halten) <b>M</b> Marker abwerfen<br>' +
@@ -1304,6 +1321,7 @@ const STR = {
 
     'credit.aria': 'Quellen anzeigen',
     'credit.html': 'Quelle: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">GSI-Kacheln (japanisches Geoinformationsamt)</a> (Höhenkacheln, aktuelle Luftbilder)',
+    'credit.buildingsHtml': 'Gebäudedaten: <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">MLIT PLATEAU</a> (CC BY 4.0) / <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-Mitwirkende (ODbL)',
 
     'loading.generic': 'Gelände wird geladen…',
     'loading.area': 'Gelände wird geladen: {name}…',
@@ -1522,6 +1540,8 @@ const STR = {
     'btn.soundOn': 'Sonido ACTIVADO',
     'btn.soundOnStalled': 'Sonido ACTIVADO…',
     'btn.soundOff': 'Sonido DESACTIVADO',
+    'btn.buildingsOn': 'Edificios ACTIVADOS',
+    'btn.buildingsOff': 'Edificios DESACTIVADOS',
 
     'help.bodyHtml':
       '<b>Espacio</b> Quemador (mantener) <b>R</b> Cuerda de venteo (mantener) <b>M</b> Lanzar marcador<br>' +
@@ -1530,6 +1550,7 @@ const STR = {
 
     'credit.aria': 'Mostrar créditos',
     'credit.html': 'Fuente: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">Teselas del GSI (Instituto Geoespacial de Japón)</a> (teselas de elevación, imágenes aéreas recientes)',
+    'credit.buildingsHtml': 'Datos de edificios: <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">MLIT PLATEAU</a> (CC BY 4.0) / colaboradores de <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> (ODbL)',
 
     'loading.generic': 'Cargando el terreno…',
     'loading.area': 'Cargando el terreno: {name}…',

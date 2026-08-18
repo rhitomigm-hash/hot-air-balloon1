@@ -20,6 +20,10 @@ const STR = {
     'hud.soundTitle': 'クリックまたはSキーでミュート切替',
     'hud.soundOn': 'ON',
     'hud.soundOff': 'OFF',
+    'hud.buildingsLabel': '建物',
+    'hud.buildingsTitle': 'クリックまたはBキーで建物表示を切替',
+    'hud.buildingsOn': 'ON',
+    'hud.buildingsOff': 'OFF',
     'hud.status': '状態',
     'hud.statusGrounded': '接地',
     'hud.statusFlying': '飛行中',
@@ -160,9 +164,10 @@ const STR = {
       '<b>Space</b> バーナー(長押し) <b>R</b> リップライン(長押し) <b>M</b> マーカー投下<br>' +
       '<b>V</b> 視点切替(ゴンドラ/外部) <b>1-4</b> 時間加速 ×1/×2/×4/×8<br>' +
       '<b>P</b> パイバル表 表示/非表示 <b>G</b> 地上クルーに無線確認(ゆらぎ有効時)<br>' +
-      '<b>S</b> 音のON/OFF マウスドラッグ: 視点回転 / ホイール: ズーム',
+      '<b>S</b> 音のON/OFF <b>B</b> 建物表示切替 マウスドラッグ: 視点回転 / ホイール: ズーム',
 
     'credit.html': '出典: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院 地理院タイル</a>(標高タイル・全国最新写真)',
+    'credit.buildingsHtml': '建物データ: <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">国土交通省 PLATEAU</a>(CC BY 4.0)/ <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors(ODbL)',
 
     'loading.generic': '地形を読み込み中…',
     'loading.area': '{name} の地形を読み込み中…',
@@ -234,6 +239,10 @@ const STR = {
     'hud.soundTitle': 'Click or press S to mute',
     'hud.soundOn': 'ON',
     'hud.soundOff': 'OFF',
+    'hud.buildingsLabel': 'Buildings',
+    'hud.buildingsTitle': 'Click or press B to toggle buildings',
+    'hud.buildingsOn': 'ON',
+    'hud.buildingsOff': 'OFF',
     'hud.status': 'Status',
     'hud.statusGrounded': 'Grounded',
     'hud.statusFlying': 'Flying',
@@ -375,9 +384,10 @@ const STR = {
       '<b>Space</b> Burner (hold) <b>R</b> Rip line (hold) <b>M</b> Drop marker<br>' +
       '<b>V</b> Toggle view (gondola/chase) <b>1-4</b> Time ×1/×2/×4/×8<br>' +
       '<b>P</b> Toggle wind table <b>G</b> Radio ground crew (when drift is on)<br>' +
-      '<b>S</b> Sound on/off Mouse drag: look around / Wheel: zoom',
+      '<b>S</b> Sound on/off <b>B</b> Toggle buildings Mouse drag: look around / Wheel: zoom',
 
     'credit.html': 'Source: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">GSI (Geospatial Information Authority of Japan) tiles</a> (elevation tiles, latest aerial imagery)',
+    'credit.buildingsHtml': 'Building data: <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">MLIT PLATEAU</a> (CC BY 4.0) / <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors (ODbL)',
 
     'loading.generic': 'Loading terrain…',
     'loading.area': 'Loading terrain: {name}…',
@@ -449,6 +459,10 @@ const STR = {
     'hud.soundTitle': 'Clique ou pressione S para silenciar',
     'hud.soundOn': 'ON',
     'hud.soundOff': 'OFF',
+    'hud.buildingsLabel': 'Prédios',
+    'hud.buildingsTitle': 'Clique ou pressione B para alternar os prédios',
+    'hud.buildingsOn': 'ON',
+    'hud.buildingsOff': 'OFF',
     'hud.status': 'Status',
     'hud.statusGrounded': 'No solo',
     'hud.statusFlying': 'Voando',
@@ -590,9 +604,10 @@ const STR = {
       '<b>Espaço</b> Queimador (segurar) <b>R</b> Respiro (segurar) <b>M</b> Lançar marcador<br>' +
       '<b>V</b> Trocar visão (cesto/externa) <b>1-4</b> Velocidade ×1/×2/×4/×8<br>' +
       '<b>P</b> Mostrar/ocultar tabela de vento <b>G</b> Chamar equipe de solo (se ativado)<br>' +
-      '<b>S</b> Som ligado/desligado Arrastar o mouse: olhar ao redor / Roda: zoom',
+      '<b>S</b> Som ligado/desligado <b>B</b> Alternar prédios Arrastar o mouse: olhar ao redor / Roda: zoom',
 
     'credit.html': 'Fonte: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">Tiles do GSI (Instituto Geoespacial do Japão)</a> (tiles de elevação, imagens aéreas recentes)',
+    'credit.buildingsHtml': 'Dados de edifícios: <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">MLIT PLATEAU</a> (CC BY 4.0) / colaboradores do <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> (ODbL)',
 
     'loading.generic': 'Carregando terreno…',
     'loading.area': 'Carregando terreno: {name}…',
@@ -664,6 +679,10 @@ const STR = {
     'hud.soundTitle': 'Kliknij lub wciśnij S, by wyciszyć',
     'hud.soundOn': 'WŁ',
     'hud.soundOff': 'WYŁ',
+    'hud.buildingsLabel': 'Budynki',
+    'hud.buildingsTitle': 'Kliknij lub wciśnij B, aby przełączyć budynki',
+    'hud.buildingsOn': 'WŁ',
+    'hud.buildingsOff': 'WYŁ',
     'hud.status': 'Stan',
     'hud.statusGrounded': 'Na ziemi',
     'hud.statusFlying': 'W locie',
@@ -805,9 +824,10 @@ const STR = {
       '<b>Spacja</b> Palnik (przytrzymaj) <b>R</b> Odpowietrznik (przytrzymaj) <b>M</b> Zrzuć znacznik<br>' +
       '<b>V</b> Zmień widok (gondola/zewnętrzny) <b>1-4</b> Przyspieszenie ×1/×2/×4/×8<br>' +
       '<b>P</b> Pokaż/ukryj tabelę wiatru <b>G</b> Wywołaj ekipę naziemną (gdy zmienność włączona)<br>' +
-      '<b>S</b> Dźwięk wł/wył Przeciąganie myszą: rozglądanie się / Kółko: zoom',
+      '<b>S</b> Dźwięk wł/wył <b>B</b> Przełącz budynki Przeciąganie myszą: rozglądanie się / Kółko: zoom',
 
     'credit.html': 'Źródło: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">Kafelki GSI (Japoński Urząd Geoprzestrzenny)</a> (kafelki wysokościowe, najnowsze zdjęcia lotnicze)',
+    'credit.buildingsHtml': 'Dane budynków: <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">MLIT PLATEAU</a> (CC BY 4.0) / współtwórcy <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> (ODbL)',
 
     'loading.generic': 'Wczytywanie terenu…',
     'loading.area': 'Wczytywanie terenu: {name}…',
@@ -879,6 +899,10 @@ const STR = {
     'hud.soundTitle': 'Cliquer ou appuyer sur S pour couper le son',
     'hud.soundOn': 'ON',
     'hud.soundOff': 'OFF',
+    'hud.buildingsLabel': 'Bâtiments',
+    'hud.buildingsTitle': 'Cliquer ou appuyer sur B pour afficher/masquer les bâtiments',
+    'hud.buildingsOn': 'ON',
+    'hud.buildingsOff': 'OFF',
     'hud.status': 'État',
     'hud.statusGrounded': 'Au sol',
     'hud.statusFlying': 'En vol',
@@ -1020,9 +1044,10 @@ const STR = {
       '<b>Espace</b> Brûleur (maintenir) <b>R</b> Évent (maintenir) <b>M</b> Larguer le marqueur<br>' +
       '<b>V</b> Changer de vue (nacelle/externe) <b>1-4</b> Vitesse ×1/×2/×4/×8<br>' +
       "<b>P</b> Afficher/masquer le tableau des vents <b>G</b> Radio à l'équipe au sol (si activé)<br>" +
-      '<b>S</b> Son activé/désactivé Glisser la souris : regarder autour / Molette : zoom',
+      '<b>S</b> Son activé/désactivé <b>B</b> Afficher/masquer les bâtiments Glisser la souris : regarder autour / Molette : zoom',
 
     'credit.html': 'Source : <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">Tuiles GSI (Institut géospatial du Japon)</a> (tuiles d\'élévation, imagerie aérienne récente)',
+    'credit.buildingsHtml': 'Données des bâtiments : <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">MLIT PLATEAU</a> (CC BY 4.0) / contributeurs <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> (ODbL)',
 
     'loading.generic': 'Chargement du terrain…',
     'loading.area': 'Chargement du terrain : {name}…',
@@ -1094,6 +1119,10 @@ const STR = {
     'hud.soundTitle': 'Klicken oder S drücken, um stummzuschalten',
     'hud.soundOn': 'AN',
     'hud.soundOff': 'AUS',
+    'hud.buildingsLabel': 'Gebäude',
+    'hud.buildingsTitle': 'Klicken oder B drücken, um Gebäude umzuschalten',
+    'hud.buildingsOn': 'AN',
+    'hud.buildingsOff': 'AUS',
     'hud.status': 'Status',
     'hud.statusGrounded': 'Am Boden',
     'hud.statusFlying': 'In der Luft',
@@ -1235,9 +1264,10 @@ const STR = {
       '<b>Leertaste</b> Brenner (halten) <b>R</b> Ablassleine (halten) <b>M</b> Marker abwerfen<br>' +
       '<b>V</b> Ansicht wechseln (Gondel/Außen) <b>1-4</b> Zeitraffer ×1/×2/×4/×8<br>' +
       '<b>P</b> Windtabelle ein-/ausblenden <b>G</b> Bodencrew per Funk rufen (wenn aktiv)<br>' +
-      '<b>S</b> Ton ein/aus Mausziehen: Umschauen / Rad: Zoom',
+      '<b>S</b> Ton ein/aus <b>B</b> Gebäude umschalten Mausziehen: Umschauen / Rad: Zoom',
 
     'credit.html': 'Quelle: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">GSI-Kacheln (japanisches Geoinformationsamt)</a> (Höhenkacheln, aktuelle Luftbilder)',
+    'credit.buildingsHtml': 'Gebäudedaten: <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">MLIT PLATEAU</a> (CC BY 4.0) / <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-Mitwirkende (ODbL)',
 
     'loading.generic': 'Gelände wird geladen…',
     'loading.area': 'Gelände wird geladen: {name}…',
@@ -1309,6 +1339,10 @@ const STR = {
     'hud.soundTitle': 'Clic o pulsa S para silenciar',
     'hud.soundOn': 'ON',
     'hud.soundOff': 'OFF',
+    'hud.buildingsLabel': 'Edificios',
+    'hud.buildingsTitle': 'Clic o pulsa B para alternar los edificios',
+    'hud.buildingsOn': 'ON',
+    'hud.buildingsOff': 'OFF',
     'hud.status': 'Estado',
     'hud.statusGrounded': 'En tierra',
     'hud.statusFlying': 'Volando',
@@ -1450,9 +1484,10 @@ const STR = {
       '<b>Espacio</b> Quemador (mantener) <b>R</b> Cuerda de venteo (mantener) <b>M</b> Lanzar marcador<br>' +
       '<b>V</b> Cambiar vista (barquilla/externa) <b>1-4</b> Velocidad ×1/×2/×4/×8<br>' +
       '<b>P</b> Mostrar/ocultar tabla de viento <b>G</b> Llamar por radio al equipo en tierra (si está activado)<br>' +
-      '<b>S</b> Sonido activado/desactivado Arrastrar el ratón: mirar alrededor / Rueda: zoom',
+      '<b>S</b> Sonido activado/desactivado <b>B</b> Alternar edificios Arrastrar el ratón: mirar alrededor / Rueda: zoom',
 
     'credit.html': 'Fuente: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">Teselas del GSI (Instituto Geoespacial de Japón)</a> (teselas de elevación, imágenes aéreas recientes)',
+    'credit.buildingsHtml': 'Datos de edificios: <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">MLIT PLATEAU</a> (CC BY 4.0) / colaboradores de <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> (ODbL)',
 
     'loading.generic': 'Cargando el terreno…',
     'loading.area': 'Cargando el terreno: {name}…',
