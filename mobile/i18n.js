@@ -153,6 +153,10 @@ const STR = {
     'pibal.panelTitle': 'パイバル観測データ',
     'pibal.note': '高度: 対地(AGL) / 風向: <span id="pibal-mode-label">FROM</span>(磁方位)',
     'pibal.closeBtn': '閉じる ▲',
+    'opts.gearAria': '設定',
+    'opts.panelTitle': '操作設定',
+    'opts.soundSectionLabel': '音',
+    'opts.buildingsSectionLabel': '建物',
     'pibal.launchTimeNote': ' (離陸時)',
 
     'btn.burnerHtml': '🔥<br>バーナー',
@@ -173,8 +177,7 @@ const STR = {
       '<b>P</b> パイバル表 表示/非表示 マウスドラッグ: 視点回転 / ホイール: ズーム',
 
     'credit.aria': '出典を表示',
-    'credit.html': '出典: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院 地理院タイル</a>(標高タイル・全国最新写真)',
-    'credit.buildingsHtml': '建物データ: <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">国土交通省 PLATEAU</a>(CC BY 4.0)/ <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors(ODbL)',
+    'credit.html': '出典: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院 地理院タイル</a>(標高タイル・全国最新写真)/ 建物データ: <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">国土交通省 PLATEAU</a>(CC BY 4.0)/ <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors(ODbL)',
 
     'loading.generic': '地形を読み込み中…',
     'loading.area': '{name} の地形を読み込み中…',
@@ -382,6 +385,10 @@ const STR = {
     'pibal.panelTitle': 'Pibal Observation Data',
     'pibal.note': 'Alt: AGL / Dir: <span id="pibal-mode-label">FROM</span> (magnetic)',
     'pibal.closeBtn': 'Close ▲',
+    'opts.gearAria': 'Settings',
+    'opts.panelTitle': 'Control Options',
+    'opts.soundSectionLabel': 'Sound',
+    'opts.buildingsSectionLabel': 'Buildings',
     'pibal.launchTimeNote': ' (at launch)',
 
     'btn.burnerHtml': '🔥<br>Burner',
@@ -402,8 +409,7 @@ const STR = {
       '<b>P</b> Toggle wind table Mouse drag: look around / Wheel: zoom',
 
     'credit.aria': 'Show credits',
-    'credit.html': 'Source: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">GSI (Geospatial Information Authority of Japan) tiles</a> (elevation tiles, latest aerial imagery)',
-    'credit.buildingsHtml': 'Building data: <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">MLIT PLATEAU</a> (CC BY 4.0) / <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors (ODbL)',
+    'credit.html': 'Source: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">GSI (Geospatial Information Authority of Japan) tiles</a> (elevation tiles, latest aerial imagery) / Building data: <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">MLIT PLATEAU</a> (CC BY 4.0) / <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors (ODbL)',
 
     'loading.generic': 'Loading terrain…',
     'loading.area': 'Loading terrain: {name}…',
@@ -613,6 +619,10 @@ const STR = {
     'pibal.panelTitle': 'Dados de Sondagem (Pibal)',
     'pibal.note': 'Alt: solo (AGL) / Dir: <span id="pibal-mode-label">FROM</span> (magnética)',
     'pibal.closeBtn': 'Fechar ▲',
+    'opts.gearAria': 'Configurações',
+    'opts.panelTitle': 'Opções de Controle',
+    'opts.soundSectionLabel': 'Som',
+    'opts.buildingsSectionLabel': 'Prédios',
     'pibal.launchTimeNote': ' (na decolagem)',
 
     'btn.burnerHtml': '🔥<br>Queimador',
@@ -633,8 +643,7 @@ const STR = {
       '<b>P</b> Mostrar/ocultar tabela de vento Arrastar o mouse: olhar ao redor / Roda: zoom',
 
     'credit.aria': 'Mostrar créditos',
-    'credit.html': 'Fonte: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">Tiles do GSI (Instituto Geoespacial do Japão)</a> (tiles de elevação, imagens aéreas recentes)',
-    'credit.buildingsHtml': 'Dados de edifícios: <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">MLIT PLATEAU</a> (CC BY 4.0) / colaboradores do <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> (ODbL)',
+    'credit.html': 'Fonte: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">Tiles do GSI (Instituto Geoespacial do Japão)</a> (tiles de elevação, imagens aéreas recentes) / Dados de edifícios: <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">MLIT PLATEAU</a> (CC BY 4.0) / colaboradores do <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> (ODbL)',
 
     'loading.generic': 'Carregando terreno…',
     'loading.area': 'Carregando terreno: {name}…',
@@ -842,6 +851,10 @@ const STR = {
     'pibal.panelTitle': 'Dane Sondażu Pilotowego',
     'pibal.note': 'Wys.: nad ziemią (AGL) / Kier.: <span id="pibal-mode-label">FROM</span> (magnetyczny)',
     'pibal.closeBtn': 'Zamknij ▲',
+    'opts.gearAria': 'Ustawienia',
+    'opts.panelTitle': 'Opcje sterowania',
+    'opts.soundSectionLabel': 'Dźwięk',
+    'opts.buildingsSectionLabel': 'Budynki',
     'pibal.launchTimeNote': ' (przy starcie)',
 
     'btn.burnerHtml': '🔥<br>Palnik',
@@ -862,8 +875,7 @@ const STR = {
       '<b>P</b> Pokaż/ukryj tabelę wiatru Przeciąganie myszą: rozglądanie się / Kółko: zoom',
 
     'credit.aria': 'Pokaż źródła',
-    'credit.html': 'Źródło: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">Kafelki GSI (Japoński Urząd Geoprzestrzenny)</a> (kafelki wysokościowe, najnowsze zdjęcia lotnicze)',
-    'credit.buildingsHtml': 'Dane budynków: <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">MLIT PLATEAU</a> (CC BY 4.0) / współtwórcy <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> (ODbL)',
+    'credit.html': 'Źródło: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">Kafelki GSI (Japoński Urząd Geoprzestrzenny)</a> (kafelki wysokościowe, najnowsze zdjęcia lotnicze) / Dane budynków: <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">MLIT PLATEAU</a> (CC BY 4.0) / współtwórcy <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> (ODbL)',
 
     'loading.generic': 'Wczytywanie terenu…',
     'loading.area': 'Wczytywanie terenu: {name}…',
@@ -1071,6 +1083,10 @@ const STR = {
     'pibal.panelTitle': 'Données de sondage pibal',
     'pibal.note': 'Alt : sol (AGL) / Dir : <span id="pibal-mode-label">FROM</span> (magnétique)',
     'pibal.closeBtn': 'Fermer ▲',
+    'opts.gearAria': 'Paramètres',
+    'opts.panelTitle': 'Options de contrôle',
+    'opts.soundSectionLabel': 'Son',
+    'opts.buildingsSectionLabel': 'Bâtiments',
     'pibal.launchTimeNote': ' (au décollage)',
 
     'btn.burnerHtml': '🔥<br>Brûleur',
@@ -1091,8 +1107,7 @@ const STR = {
       '<b>P</b> Afficher/masquer le tableau des vents Glisser la souris : regarder autour / Molette : zoom',
 
     'credit.aria': 'Afficher les crédits',
-    'credit.html': 'Source : <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">Tuiles GSI (Institut géospatial du Japon)</a> (tuiles d\'élévation, imagerie aérienne récente)',
-    'credit.buildingsHtml': 'Données des bâtiments : <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">MLIT PLATEAU</a> (CC BY 4.0) / contributeurs <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> (ODbL)',
+    'credit.html': 'Source : <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">Tuiles GSI (Institut géospatial du Japon)</a> (tuiles d\'élévation, imagerie aérienne récente) / Données des bâtiments : <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">MLIT PLATEAU</a> (CC BY 4.0) / contributeurs <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> (ODbL)',
 
     'loading.generic': 'Chargement du terrain…',
     'loading.area': 'Chargement du terrain : {name}…',
@@ -1300,6 +1315,10 @@ const STR = {
     'pibal.panelTitle': 'Pibal-Messdaten',
     'pibal.note': 'Höhe: ü. Grund (AGL) / Richt.: <span id="pibal-mode-label">FROM</span> (magnetisch)',
     'pibal.closeBtn': 'Schließen ▲',
+    'opts.gearAria': 'Einstellungen',
+    'opts.panelTitle': 'Steuerungsoptionen',
+    'opts.soundSectionLabel': 'Ton',
+    'opts.buildingsSectionLabel': 'Gebäude',
     'pibal.launchTimeNote': ' (beim Start)',
 
     'btn.burnerHtml': '🔥<br>Brenner',
@@ -1320,8 +1339,7 @@ const STR = {
       '<b>P</b> Windtabelle ein-/ausblenden Mausziehen: Umschauen / Rad: Zoom',
 
     'credit.aria': 'Quellen anzeigen',
-    'credit.html': 'Quelle: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">GSI-Kacheln (japanisches Geoinformationsamt)</a> (Höhenkacheln, aktuelle Luftbilder)',
-    'credit.buildingsHtml': 'Gebäudedaten: <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">MLIT PLATEAU</a> (CC BY 4.0) / <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-Mitwirkende (ODbL)',
+    'credit.html': 'Quelle: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">GSI-Kacheln (japanisches Geoinformationsamt)</a> (Höhenkacheln, aktuelle Luftbilder) / Gebäudedaten: <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">MLIT PLATEAU</a> (CC BY 4.0) / <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-Mitwirkende (ODbL)',
 
     'loading.generic': 'Gelände wird geladen…',
     'loading.area': 'Gelände wird geladen: {name}…',
@@ -1529,6 +1547,10 @@ const STR = {
     'pibal.panelTitle': 'Datos de Sondeo Pibal',
     'pibal.note': 'Alt.: sobre el suelo (AGL) / Dir.: <span id="pibal-mode-label">FROM</span> (magnética)',
     'pibal.closeBtn': 'Cerrar ▲',
+    'opts.gearAria': 'Ajustes',
+    'opts.panelTitle': 'Opciones de control',
+    'opts.soundSectionLabel': 'Sonido',
+    'opts.buildingsSectionLabel': 'Edificios',
     'pibal.launchTimeNote': ' (al despegar)',
 
     'btn.burnerHtml': '🔥<br>Quemador',
@@ -1549,8 +1571,7 @@ const STR = {
       '<b>P</b> Mostrar/ocultar tabla de viento Arrastrar el ratón: mirar alrededor / Rueda: zoom',
 
     'credit.aria': 'Mostrar créditos',
-    'credit.html': 'Fuente: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">Teselas del GSI (Instituto Geoespacial de Japón)</a> (teselas de elevación, imágenes aéreas recientes)',
-    'credit.buildingsHtml': 'Datos de edificios: <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">MLIT PLATEAU</a> (CC BY 4.0) / colaboradores de <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> (ODbL)',
+    'credit.html': 'Fuente: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">Teselas del GSI (Instituto Geoespacial de Japón)</a> (teselas de elevación, imágenes aéreas recientes) / Datos de edificios: <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">MLIT PLATEAU</a> (CC BY 4.0) / colaboradores de <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> (ODbL)',
 
     'loading.generic': 'Cargando el terreno…',
     'loading.area': 'Cargando el terreno: {name}…',

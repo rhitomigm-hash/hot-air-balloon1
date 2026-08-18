@@ -432,7 +432,7 @@ function togglePibal() {
   p.style.display = hidden ? 'block' : 'none';
   // 開いている間は他の4ボタン(視点/加速/風データ/音)を隠し、パネルがその場所を使う。
   // 閉じる操作はパネル右下の「閉じる」ボタンで行う
-  for (const id of ['btn-view', 'btn-speed', 'btn-pibal', 'btn-sound', 'btn-buildings']) {
+  for (const id of ['btn-view', 'btn-speed', 'btn-pibal', 'btn-settings']) {
     document.getElementById(id).style.display = hidden ? 'none' : '';
   }
   // 地上クルーボタンはパネルと同じ右上に重なるため、有効な時だけ連動して隠す
@@ -447,6 +447,15 @@ function toggleCredit() {
   c.style.display = hidden ? 'block' : 'none';
 }
 document.getElementById('credit-toggle').addEventListener('click', toggleCredit);
+
+// 操作設定(歯車アイコン)開閉。音・建物のON/OFFをこのパネルに集約する
+function toggleSettingsPanel() {
+  const p = document.getElementById('settings-panel');
+  const hidden = getComputedStyle(p).display === 'none';
+  p.style.display = hidden ? 'block' : 'none';
+}
+document.getElementById('btn-settings').addEventListener('click', toggleSettingsPanel);
+document.getElementById('settings-panel-close').addEventListener('click', toggleSettingsPanel);
 const langSelect = document.getElementById('lang-select');
 langSelect.value = LANG;
 langSelect.addEventListener('change', () => setLang(langSelect.value));

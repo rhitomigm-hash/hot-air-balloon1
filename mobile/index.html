@@ -117,6 +117,19 @@
     display: none; bottom: 140px; left: 12px; right: auto;
     max-width: min(88vw, 420px); font-size: 11px; color: #b8c4d0; line-height: 1.6;
   }
+  /* 操作設定(歯車アイコン)。音・建物のON/OFFをここに集約し、常時表示のボタンを減らす */
+  #btn-settings {
+    position: fixed; bottom: 12px; right: 50%; margin-right: 112px; z-index: 6;
+    width: 30px; height: 30px; border-radius: 50%; border: 1px solid #4a6a8a;
+    background: rgba(15, 30, 45, 0.75); color: #cdd9e4; font-size: 15px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  #settings-panel {
+    display: none; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    min-width: 220px; max-width: min(88vw, 300px); z-index: 7;
+  }
+  #settings-panel .b-sub:first-child { margin-top: 0; }
+  #settings-panel-close { display: block; margin: 14px 0 0 auto; }
   #credit a { color: #9ecfff; }
   #loading {
     position: fixed; inset: 0; display: flex; flex-direction: column;
@@ -371,6 +384,7 @@
     #touch-tools { gap: 6px; }
     #compass { width: 92px; height: 92px; bottom: 14px; }
     #credit-toggle { bottom: 14px; margin-right: 56px; }
+    #btn-settings { bottom: 14px; margin-right: 98px; }
     /* 右側のアクションボタン列と被らないよう、幅を狭める */
     #credit { font-size: 9px; padding: 4px 8px; max-width: calc(100vw - 170px); }
     .b-panel { padding: 12px 14px 16px; }
@@ -562,8 +576,6 @@
   <button id="btn-speed" type="button"><span data-i18n="btn.speed">加速 ×</span><span id="tscale-btn">1</span></button>
   <button id="btn-pibal" type="button" data-i18n="btn.pibal">風データ</button>
   <button id="btn-groundcrew" type="button" style="display:none" data-i18n="gw.groundCrewBtn">地上クルー</button>
-  <button id="btn-sound" type="button">音 ON</button>
-  <button id="btn-buildings" type="button">建物 OFF</button>
 </div>
 
 <div id="gw-report" class="panel"></div>
@@ -576,10 +588,18 @@
 
 <button id="credit-toggle" type="button" aria-label="出典を表示" data-i18n-attr="aria-label:credit.aria">ⓘ</button>
 <div id="credit" class="panel" data-i18n-html="credit.html">
-  出典: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院 地理院タイル</a>(標高タイル・全国最新写真)
-</div>
-<div id="credit-buildings" class="panel" data-i18n-html="credit.buildingsHtml">
+  出典: <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院 地理院タイル</a>(標高タイル・全国最新写真)/
   建物データ: <a href="https://www.mlit.go.jp/plateau/" target="_blank" rel="noopener">国土交通省 PLATEAU</a>(CC BY 4.0)/ <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors(ODbL)
+</div>
+
+<button id="btn-settings" type="button" aria-label="設定" data-i18n-attr="aria-label:opts.gearAria">⚙</button>
+<div id="settings-panel" class="panel">
+  <div class="pibal-head"><b data-i18n="opts.panelTitle">操作設定</b></div>
+  <div class="b-sub" data-i18n="opts.soundSectionLabel">音</div>
+  <button id="btn-sound" type="button">音 ON</button>
+  <div class="b-sub" data-i18n="opts.buildingsSectionLabel">建物</div>
+  <button id="btn-buildings" type="button">建物 OFF</button>
+  <button id="settings-panel-close" type="button" data-i18n="pibal.closeBtn">閉じる ▲</button>
 </div>
 
 <div id="mp-join">
