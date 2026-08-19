@@ -59,7 +59,7 @@ const ghostMeshes = new Map(); // playerId -> THREE.Group(他プレイヤーの�
 const ghostMarkers = new Map(); // playerId -> { mesh, vel:THREE.Vector3, landed }(他プレイヤーのマーカー、見た目のみ)
 
 // ---- 舞台設定 ----
-const TILE_RADIUS = 2; // 5x5タイル ≒ 20km四方
+const TILE_RADIUS = 3; // 7x7タイル ≒ 28km四方(気球が離陸地点から離れても建物・地形が途切れにくいよう拡張)
 let AREA = null;       // { lon, lat, name? } エリア選択またはURLで決まる
 
 // 日本の主な気球競技開催地(エリア選択のプリセット)
@@ -645,9 +645,11 @@ function setupAreaMap(onSelect) {
     if (sel) {
       const t = lonLatToTile(sel.lon, sel.lat, z);
       const [sx, sy] = toScreen(t.x, t.y);
-      // この緯度・ズームでの1画面ピクセルあたりの実距離から20km枠を描く
+      // この緯度・ズームでの1画面ピクセルあたりの実距離からフライトエリア枠を描く
+      // (TILE_RADIUSに連動させる。terrain.jsのtileMeters計算と同じ式)
       const mpp = (156543.03392 * Math.cos((sel.lat * Math.PI) / 180)) / 2 ** z;
-      const box = 20460 / mpp;
+      const areaMeters = (40075016.686 / 2 ** 13) * Math.cos((sel.lat * Math.PI) / 180) * (TILE_RADIUS * 2 + 1);
+      const box = areaMeters / mpp;
       ctx.strokeStyle = '#ff5a00';
       ctx.lineWidth = 3;
       ctx.strokeRect(sx - box / 2, sy - box / 2, box, box);

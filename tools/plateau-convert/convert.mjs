@@ -10,10 +10,12 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { writeFile } from 'node:fs/promises';
 import { simplifyFootprint } from '../osm-buildings-convert/simplify.mjs';
+import { tileKeyFor, selectByTileQuota } from '../osm-buildings-convert/tile-quota.mjs';
 
 const execFileAsync = promisify(execFile);
-const MAX_BUILDINGS = 8000;
+const MAX_BUILDINGS = 28000; // TILE_RADIUS 2→3拡張(面積約1.96倍)に合わせて増量
 const MAX_VERTICES = 12;
+const MIN_PER_TILE = 20;
 const LICENSE = 'Project PLATEAU (国土交通省) Site Policy に拠る、複製・公衆送信等自由利用可 https://www.mlit.go.jp/plateau/site-policy/';
 
 async function listBldgFiles(zipPath) {
@@ -87,12 +89,17 @@ function extractBuildings(gmlText, centerLon, centerLat, radiusKm) {
     const cLat = b.footprint.reduce((s, p) => s + p[1], 0) / b.footprint.length;
     const distKm = roughDistKm(cLon, cLat, centerLon, centerLat);
     if (distKm > radiusKm) continue;
-    buildings.push({ footprint: simplifyFootprint(b.footprint, MAX_VERTICES), height: b.height, _distKm: distKm });
+    buildings.push({
+      footprint: simplifyFootprint(b.footprint, MAX_VERTICES),
+      height: b.height,
+      _distKm: distKm,
+      _tileKey: tileKeyFor(cLon, cLat, centerLon, centerLat),
+    });
   }
   return buildings;
 }
 
-export async function convertZip(zipPath, centerLon, centerLat, radiusKm = 10) {
+export async function convertZip(zipPath, centerLon, centerLat, radiusKm = 15) {
   const files = await listBldgFiles(zipPath);
   console.log(`  メッシュファイル${files.length}件から範囲内のものを判定中...`);
 
@@ -109,8 +116,7 @@ export async function convertZip(zipPath, centerLon, centerLat, radiusKm = 10) {
     all = all.concat(extractBuildings(gml, centerLon, centerLat, radiusKm));
   }
 
-  all.sort((a, b) => a._distKm - b._distKm);
-  const limited = all.slice(0, MAX_BUILDINGS).map(({ _distKm, ...b }) => b);
+  const limited = selectByTileQuota(all, MAX_BUILDINGS, MIN_PER_TILE);
 
   return {
     source: 'plateau',
@@ -127,7 +133,7 @@ async function main() {
     process.exit(1);
   }
   const lon = Number(lonStr), lat = Number(latStr);
-  const radiusKm = radiusStr ? Number(radiusStr) : 10;
+  const radiusKm = radiusStr ? Number(radiusStr) : 15;
   console.log(`PLATEAU変換開始 (中心 ${lon},${lat} 半径${radiusKm}km)`);
   const result = await convertZip(zipPath, lon, lat, radiusKm);
   await writeFile(outPath, JSON.stringify(result));
