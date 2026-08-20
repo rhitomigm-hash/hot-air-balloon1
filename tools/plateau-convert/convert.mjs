@@ -5,12 +5,12 @@
 // 事前にG空間情報センター(geospatial.jp)からCityGML ZIPをダウンロードしておくこと。
 // ZIPはリポジトリにコミットしない(サイズが大きいため.gitignore対象)。
 //
-// 使い方: node convert.mjs <CityGML ZIPパス> <中心lon> <中心lat> <出力先.json> [半径km(既定10)]
+// 使い方: node convert.mjs <CityGML ZIPパス> <中心lon> <中心lat> <出力先.json> [半径km(既定15)] [上限棟数(既定28000)]
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { writeFile } from 'node:fs/promises';
 import { simplifyFootprint } from '../osm-buildings-convert/simplify.mjs';
-import { tileKeyFor, selectByTileQuota } from '../osm-buildings-convert/tile-quota.mjs';
+import { tileKeyFor, selectByTileQuota, footprintAreaM2 } from '../osm-buildings-convert/tile-quota.mjs';
 
 const execFileAsync = promisify(execFile);
 const MAX_BUILDINGS = 28000; // TILE_RADIUS 2→3拡張(面積約1.96倍)に合わせて増量
@@ -94,12 +94,13 @@ function extractBuildings(gmlText, centerLon, centerLat, radiusKm) {
       height: b.height,
       _distKm: distKm,
       _tileKey: tileKeyFor(cLon, cLat, centerLon, centerLat),
+      _areaM2: footprintAreaM2(b.footprint, cLat),
     });
   }
   return buildings;
 }
 
-export async function convertZip(zipPath, centerLon, centerLat, radiusKm = 15) {
+export async function convertZip(zipPath, centerLon, centerLat, radiusKm = 15, maxBuildings = MAX_BUILDINGS) {
   const files = await listBldgFiles(zipPath);
   console.log(`  メッシュファイル${files.length}件から範囲内のものを判定中...`);
 
@@ -116,7 +117,7 @@ export async function convertZip(zipPath, centerLon, centerLat, radiusKm = 15) {
     all = all.concat(extractBuildings(gml, centerLon, centerLat, radiusKm));
   }
 
-  const limited = selectByTileQuota(all, MAX_BUILDINGS, MIN_PER_TILE);
+  const limited = selectByTileQuota(all, maxBuildings, MIN_PER_TILE);
 
   return {
     source: 'plateau',
@@ -127,15 +128,16 @@ export async function convertZip(zipPath, centerLon, centerLat, radiusKm = 15) {
 }
 
 async function main() {
-  const [zipPath, lonStr, latStr, outPath, radiusStr] = process.argv.slice(2);
+  const [zipPath, lonStr, latStr, outPath, radiusStr, maxBuildingsStr] = process.argv.slice(2);
   if (!zipPath || !lonStr || !latStr || !outPath) {
-    console.error('使い方: node convert.mjs <CityGML ZIPパス> <中心lon> <中心lat> <出力先.json> [半径km]');
+    console.error('使い方: node convert.mjs <CityGML ZIPパス> <中心lon> <中心lat> <出力先.json> [半径km] [上限棟数]');
     process.exit(1);
   }
   const lon = Number(lonStr), lat = Number(latStr);
   const radiusKm = radiusStr ? Number(radiusStr) : 15;
-  console.log(`PLATEAU変換開始 (中心 ${lon},${lat} 半径${radiusKm}km)`);
-  const result = await convertZip(zipPath, lon, lat, radiusKm);
+  const maxBuildings = maxBuildingsStr ? Number(maxBuildingsStr) : MAX_BUILDINGS;
+  console.log(`PLATEAU変換開始 (中心 ${lon},${lat} 半径${radiusKm}km 上限${maxBuildings}棟)`);
+  const result = await convertZip(zipPath, lon, lat, radiusKm, maxBuildings);
   await writeFile(outPath, JSON.stringify(result));
   console.log(`${result.buildings.length}棟 → ${outPath}`);
 }

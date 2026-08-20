@@ -130,6 +130,7 @@
   }
   #settings-panel .b-sub:first-child { margin-top: 0; }
   #settings-panel-close { display: block; margin: 14px 0 0 auto; }
+  #btn-buildings:disabled { background: #33414f; color: #8a99a8; cursor: default; }
   #credit a { color: #9ecfff; }
   #loading {
     position: fixed; inset: 0; display: flex; flex-direction: column;
@@ -208,6 +209,12 @@
     border: 1px solid #345a7a; border-radius: 4px; cursor: crosshair; display: block;
   }
   .mapnote { font-size: 11px; color: #9ab; margin-top: 6px; }
+  .buildings-tier-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+  .buildings-tier-row label { font-size: 12px; color: #9ab; white-space: nowrap; }
+  .buildings-tier-row select {
+    flex: 1; background: #1a2a3a; border: 1px solid #345a7a; border-radius: 4px;
+    color: #e8f0f6; font-size: 12px; padding: 4px 8px; cursor: pointer;
+  }
 
   /* ---- タッチ操作ボタン ---- */
   .tbtn {
@@ -437,6 +444,14 @@
     <div class="a-presets" id="area-presets"></div>
     <canvas id="area-map" width="1280" height="960"></canvas>
     <div class="mapnote" data-i18n="areasel.mapnote">タップ: エリア中心を選択(橙枠 = 約20km四方の飛行エリア、中央がターゲット)/ ピンチ: 拡大縮小 / ドラッグ: 移動</div>
+    <div class="buildings-tier-row">
+      <label for="buildings-tier-select" data-i18n="areasel.buildingsTierLabel">建物データ</label>
+      <select id="buildings-tier-select">
+        <option value="none" data-i18n="areasel.buildingsTierNone">建物データなし</option>
+        <option value="simple" data-i18n="areasel.buildingsTierSimple">建物データ有り(簡易 Wi-Fi環境推奨)</option>
+        <option value="detailed" data-i18n="areasel.buildingsTierDetailed">建物データ有り(詳細 Wi-Fi環境推奨 高負荷)</option>
+      </select>
+    </div>
     <button id="area-btn" disabled data-i18n="areasel.btnDefault">地図でエリアを選択してください</button>
   </div>
 </div>

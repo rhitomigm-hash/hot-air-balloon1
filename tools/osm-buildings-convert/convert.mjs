@@ -4,13 +4,13 @@
 // 開発時に手動で1回実行し、結果をリポジトリにコミットする運用(ランタイムでの
 // Overpass API呼び出しはしない。Overpass公式が本番の重い利用を非推奨としているため)。
 //
-// 使い方: node convert.mjs <areaId> <lon> <lat> <出力先.json> [半径km(既定10)]
+// 使い方: node convert.mjs <areaId> <lon> <lat> <出力先.json> [半径km(既定15)] [上限棟数(既定28000)]
 import { writeFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { heightOf } from './height-default.mjs';
 import { simplifyFootprint } from './simplify.mjs';
-import { tileKeyFor, selectByTileQuota } from './tile-quota.mjs';
+import { tileKeyFor, selectByTileQuota, footprintAreaM2 } from './tile-quota.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -46,7 +46,7 @@ async function fetchOverpass(query) {
       try {
         const { stdout } = await execFileAsync(
           'curl',
-          ['-sS', '--fail', '--max-time', '90', '-X', 'POST', '-d', `data=${query}`, endpoint],
+          ['-sS', '--fail', '--max-time', '150', '-X', 'POST', '-d', `data=${query}`, endpoint],
           { maxBuffer: 1024 * 1024 * 256 },
         );
         return JSON.parse(stdout);
@@ -66,9 +66,9 @@ function roughDistKm(lon, lat, cLon, cLat) {
   return Math.sqrt(dLat * dLat + dLon * dLon);
 }
 
-export async function convertArea(areaId, lon, lat, radiusKm = 15) {
+export async function convertArea(areaId, lon, lat, radiusKm = 15, maxBuildings = MAX_BUILDINGS) {
   const bbox = bboxAround(lon, lat, radiusKm);
-  const query = `[out:json][timeout:90];(way["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east}););out geom;`;
+  const query = `[out:json][timeout:120];(way["building"](${bbox.south},${bbox.west},${bbox.north},${bbox.east}););out geom;`;
   const data = await fetchOverpass(query);
 
   const elements = Array.isArray(data?.elements) ? data.elements : [];
@@ -84,10 +84,11 @@ export async function convertArea(areaId, lon, lat, radiusKm = 15) {
       height,
       _distKm: roughDistKm(cLon, cLat, lon, lat),
       _tileKey: tileKeyFor(cLon, cLat, lon, lat),
+      _areaM2: footprintAreaM2(footprint, cLat),
     });
   }
 
-  const limited = selectByTileQuota(buildings, MAX_BUILDINGS, MIN_PER_TILE);
+  const limited = selectByTileQuota(buildings, maxBuildings, MIN_PER_TILE);
 
   return {
     source: 'osm',
@@ -98,15 +99,16 @@ export async function convertArea(areaId, lon, lat, radiusKm = 15) {
 }
 
 async function main() {
-  const [areaId, lonStr, latStr, outPath, radiusStr] = process.argv.slice(2);
+  const [areaId, lonStr, latStr, outPath, radiusStr, maxBuildingsStr] = process.argv.slice(2);
   if (!areaId || !lonStr || !latStr || !outPath) {
-    console.error('使い方: node convert.mjs <areaId> <lon> <lat> <出力先.json> [半径km]');
+    console.error('使い方: node convert.mjs <areaId> <lon> <lat> <出力先.json> [半径km] [上限棟数]');
     process.exit(1);
   }
   const lon = Number(lonStr), lat = Number(latStr);
   const radiusKm = radiusStr ? Number(radiusStr) : 15;
-  console.log(`[${areaId}] Overpassへ問い合わせ中 (中心 ${lon},${lat} 半径${radiusKm}km)...`);
-  const result = await convertArea(areaId, lon, lat, radiusKm);
+  const maxBuildings = maxBuildingsStr ? Number(maxBuildingsStr) : MAX_BUILDINGS;
+  console.log(`[${areaId}] Overpassへ問い合わせ中 (中心 ${lon},${lat} 半径${radiusKm}km 上限${maxBuildings}棟)...`);
+  const result = await convertArea(areaId, lon, lat, radiusKm, maxBuildings);
   await writeFile(outPath, JSON.stringify(result));
   console.log(`[${areaId}] ${result.buildings.length}棟 → ${outPath}`);
 }

@@ -516,7 +516,11 @@ soundBtn.addEventListener('click', () => {
 // 初回ONの瞬間だけ非同期でデータ取得・ジオメトリ構築を行い(buildingsLayerにキャッシュ)、
 // 以降はgroup.visibleの切り替えのみで即時反映する
 const BUILDINGS_KEY = 'balloon-buildings';
+const BUILDINGS_TIER_KEY = 'balloon-buildings-tier';
 let buildingsOn = localStorage.getItem(BUILDINGS_KEY) === 'on';
+// エリア選択画面で選ぶ表示ティア。'none'ならデータなし(既定)、'simple'/'detailed'なら
+// それぞれ軽量/高密度データを使う。一度決めたらそのフライト中は変わらない
+let buildingsTier = localStorage.getItem(BUILDINGS_TIER_KEY) || 'none';
 let buildingsLayer = null;
 let buildingsLoading = false;
 // terrain(下でconst宣言、地形読み込み完了まで未初期化)への参照はロード完了後まで安全でないため、
@@ -526,18 +530,28 @@ let terrainReady = false;
 const buildingsBtn = document.getElementById('btn-buildings');
 const renderBuildingsBtn = () => {
   buildingsBtn.textContent = buildingsOn ? t('btn.buildingsOn') : t('btn.buildingsOff');
+  buildingsBtn.disabled = buildingsTier === 'none';
 };
 renderBuildingsBtn();
 buildingsBtn.addEventListener('click', async () => {
+  if (buildingsTier === 'none') return;
   buildingsOn = !buildingsOn;
   localStorage.setItem(BUILDINGS_KEY, buildingsOn ? 'on' : 'off');
   renderBuildingsBtn();
   await applyBuildingsVisibility();
 });
 
+const buildingsTierSelect = document.getElementById('buildings-tier-select');
+buildingsTierSelect.value = buildingsTier;
+buildingsTierSelect.addEventListener('change', () => {
+  buildingsTier = buildingsTierSelect.value;
+  localStorage.setItem(BUILDINGS_TIER_KEY, buildingsTier);
+  renderBuildingsBtn();
+});
+
 async function applyBuildingsVisibility() {
   if (!terrainReady) return; // 地形読み込み完了後、末尾の呼び出しで改めて反映される
-  if (!buildingsOn) {
+  if (buildingsTier === 'none' || !buildingsOn) {
     if (buildingsLayer) buildingsLayer.setVisible(false);
     return;
   }
@@ -545,7 +559,7 @@ async function applyBuildingsVisibility() {
   if (buildingsLoading) return;
   buildingsLoading = true;
   try {
-    buildingsLayer = await buildBuildings(AREA.id, terrain);
+    buildingsLayer = await buildBuildings(AREA.id, buildingsTier, terrain);
     scene.add(buildingsLayer.group);
   } finally {
     buildingsLoading = false;

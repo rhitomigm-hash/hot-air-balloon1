@@ -367,7 +367,11 @@ document.getElementById('sound-status').textContent = soundOn ? t('hud.soundOn')
 // 初回ONの瞬間だけ非同期でデータ取得・ジオメトリ構築を行い(buildingsLayerにキャッシュ)、
 // 以降はgroup.visibleの切り替えのみで即時反映する
 const BUILDINGS_KEY = 'balloon-buildings';
+const BUILDINGS_TIER_KEY = 'balloon-buildings-tier';
 let buildingsOn = localStorage.getItem(BUILDINGS_KEY) === 'on';
+// エリア選択画面で選ぶ表示ティア。'none'ならデータなし(既定)、'simple'/'detailed'なら
+// それぞれ軽量/高密度データを使う。一度決めたらそのフライト中は変わらない
+let buildingsTier = localStorage.getItem(BUILDINGS_TIER_KEY) || 'none';
 let buildingsLayer = null;
 let buildingsLoading = false;
 // terrain(下でconst宣言、地形読み込み完了まで未初期化)への参照はロード完了後まで安全でないため、
@@ -375,6 +379,7 @@ let buildingsLoading = false;
 let terrainReady = false;
 
 async function toggleBuildings() {
+  if (buildingsTier === 'none') return; // エリア選択で「なし」を選んでいる間は操作不可
   buildingsOn = !buildingsOn;
   localStorage.setItem(BUILDINGS_KEY, buildingsOn ? 'on' : 'off');
   document.getElementById('buildings-status').textContent =
@@ -382,9 +387,15 @@ async function toggleBuildings() {
   await applyBuildingsVisibility();
 }
 
+// エリア選択で決まったbuildingsTierに応じて、計器パネルの「建物」行の有効/無効を切り替える
+function applyBuildingsRowEnabled() {
+  const row = document.getElementById('buildings-row');
+  row.classList.toggle('disabled', buildingsTier === 'none');
+}
+
 async function applyBuildingsVisibility() {
   if (!terrainReady) return; // 地形読み込み完了後、末尾の呼び出しで改めて反映される
-  if (!buildingsOn) {
+  if (buildingsTier === 'none' || !buildingsOn) {
     if (buildingsLayer) buildingsLayer.setVisible(false);
     return;
   }
@@ -392,7 +403,7 @@ async function applyBuildingsVisibility() {
   if (buildingsLoading) return;
   buildingsLoading = true;
   try {
-    buildingsLayer = await buildBuildings(AREA.id, terrain);
+    buildingsLayer = await buildBuildings(AREA.id, buildingsTier, terrain);
     scene.add(buildingsLayer.group);
   } finally {
     buildingsLoading = false;
@@ -400,8 +411,17 @@ async function applyBuildingsVisibility() {
 }
 document.getElementById('buildings-status').textContent =
   buildingsOn ? t('hud.buildingsOn') : t('hud.buildingsOff');
+applyBuildingsRowEnabled();
 document.getElementById('sound-row').addEventListener('click', toggleSound);
 document.getElementById('buildings-row').addEventListener('click', toggleBuildings);
+
+const buildingsTierSelect = document.getElementById('buildings-tier-select');
+buildingsTierSelect.value = buildingsTier;
+buildingsTierSelect.addEventListener('change', () => {
+  buildingsTier = buildingsTierSelect.value;
+  localStorage.setItem(BUILDINGS_TIER_KEY, buildingsTier);
+  applyBuildingsRowEnabled();
+});
 
 // 毎フレーム呼ばれ、入力状態・風速に音量を追従させる
 function updateSounds(windKt) {

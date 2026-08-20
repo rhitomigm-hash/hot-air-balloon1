@@ -106,13 +106,15 @@ function buildRoofGeometry({ pts2d, cx, cz, groundY, h }, tile, tileMeters) {
   return geo;
 }
 
-// areaId: PRESET_AREASの id。データが無い/取得失敗なら建物0棟の空レイヤーを返す(フェイルセーフ)
-export async function buildBuildings(areaId, terrain, onProgress) {
-  if (!areaId) return emptyLayer();
+// areaId: PRESET_AREASの id。tier: 'simple'(軽量・4G/低スペック向け)または'detailed'
+// (高密度・Wi-Fi推奨)。データが無い/取得失敗なら建物0棟の空レイヤーを返す(フェイルセーフ)
+export async function buildBuildings(areaId, tier, terrain, onProgress) {
+  if (!areaId || (tier !== 'simple' && tier !== 'detailed')) return emptyLayer();
 
+  const suffix = tier === 'simple' ? '-simple' : '';
   let data;
   try {
-    const res = await fetch(`./data/buildings/${areaId}.json`);
+    const res = await fetch(`./data/buildings/${areaId}${suffix}.json`);
     if (!res.ok) return emptyLayer();
     data = await res.json();
   } catch {
