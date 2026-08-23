@@ -18,8 +18,27 @@ export function lonLatToTile(lon, lat, z) {
 
 async function fetchBitmap(url) {
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`tile fetch failed: ${res.status} ${url}`);
+  if (!res.ok) {
+    const err = new Error(`tile fetch failed: ${res.status} ${url}`);
+    err.status = res.status;
+    throw err;
+  }
   return createImageBitmap(await res.blob());
+}
+
+// 404(タイルが本当に存在しない、海上等)以外は通信の一時的な失敗とみなし再試行する
+async function fetchBitmapRetry(url, attempts = 3) {
+  let lastErr;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fetchBitmap(url);
+    } catch (e) {
+      lastErr = e;
+      if (e && e.status && e.status !== 429 && e.status < 500) throw e;
+      if (i < attempts - 1) await new Promise((r) => setTimeout(r, 300 * (i + 1)));
+    }
+  }
+  throw lastErr;
 }
 
 function decodeDem(bitmap) {
@@ -61,16 +80,32 @@ export async function buildTerrain(centerLon, centerLat, radius, onProgress) {
   const tick = () => { done++; if (onProgress) onProgress(done, total); };
 
   // --- DEM 読み込み(全タイル揃えてから頂点を張ると継ぎ目が出ない) ---
+  const failedKeys = []; // 通信の一時的な失敗(後で周辺タイルの平均標高で埋める)
   await Promise.all(coords.map(async ([tx, ty]) => {
+    const key = `${tx}_${ty}`;
     try {
-      const bmp = await fetchBitmap(`https://cyberjapandata.gsi.go.jp/xyz/dem_png/${DEM_Z}/${tx}/${ty}.png`);
-      demTiles.set(`${tx}_${ty}`, decodeDem(bmp));
-    } catch {
-      // 海上などタイルが存在しない場所は標高0の平面にする
-      demTiles.set(`${tx}_${ty}`, new Float32Array(TILE_PX * TILE_PX));
+      const bmp = await fetchBitmapRetry(`https://cyberjapandata.gsi.go.jp/xyz/dem_png/${DEM_Z}/${tx}/${ty}.png`);
+      demTiles.set(key, decodeDem(bmp));
+    } catch (e) {
+      if (e && e.status === 404) {
+        // 本当にタイルが存在しない場所(海上等)は標高0の平面にする
+        demTiles.set(key, new Float32Array(TILE_PX * TILE_PX));
+      } else {
+        // それ以外(通信エラー等)は、周辺の平均標高が判明してから埋める。
+        // ここでいきなり標高0にすると、実際の標高との段差が不自然な絶壁になる
+        failedKeys.push(key);
+      }
     }
     tick();
   }));
+  if (failedKeys.length) {
+    let sum = 0, n = 0;
+    for (const arr of demTiles.values()) {
+      for (let i = 0; i < arr.length; i += 16) { sum += arr[i]; n++; } // 間引いて平均を概算
+    }
+    const fillArr = new Float32Array(TILE_PX * TILE_PX).fill(n > 0 ? sum / n : 0);
+    for (const key of failedKeys) demTiles.set(key, fillArr);
+  }
 
   // グローバルピクセル座標(タイル座標*256)で標高をバイリニア補間
   function samplePixel(gx, gy) {

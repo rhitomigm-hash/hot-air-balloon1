@@ -1,6 +1,8 @@
-// 建物の3D表現(LOD1相当の押し出しジオメトリ)。壁は単色、屋根だけ地形と同じ
-// 航空写真テクスチャを貼る(terrain.getTileAt()でタイルのmaterialをそのまま共有
-// するため、地形側のLOD昇格・テクスチャ差し替えが屋根にも自動で反映される)。
+// 建物の3D表現(LOD1相当の押し出しジオメトリ)。壁はオフホワイト1色を基準に、
+// 1棟ごとに明るさを少しずつ変えて単調さを消す(下のWALL_SHADE_MIN周辺を参照)。
+// 屋根だけ地形と同じ航空写真テクスチャを貼る(terrain.getTileAt()でタイルの
+// materialをそのまま共有するため、地形側のLOD昇格・テクスチャ差し替えが
+// 屋根にも自動で反映される)。
 // データは PLATEAU(国交省・CC BY 4.0)/OSM Buildings のいずれかを、あらかじめ
 // tools/plateau-convert・tools/osm-buildings-convert で統一スキーマJSONに変換したものを使う:
 //   { source, license, generatedAt, buildings: [{ footprint: [[lon,lat],...], height }] }
@@ -9,7 +11,32 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-const WALL_MATERIAL = new THREE.MeshLambertMaterial({ color: 0xb8b0a4 });
+// 壁は全棟の形状を1つのジオメトリに統合して1回で描くため、棟ごとに色を変えるには
+// 頂点カラーを使うしかない(棟ごとにmaterialを分けると統合が壊れ、ドローコールが
+// 棟数分に増えてしまう)。materialの色 × 頂点カラー で最終的な色が決まるので、
+// ここの色が「最も明るい棟の色」、頂点カラーがそこからの暗さの倍率になる
+const WALL_MATERIAL = new THREE.MeshLambertMaterial({ color: 0xf5f3ef, vertexColors: true });
+
+// 明るさのばらつきの下限(見た目=sRGB基準の倍率。1.0でベース色そのまま)。
+// 0.82なら中央値0.91を挟んでおよそ±10%の幅になる
+const WALL_SHADE_MIN = 0.82;
+
+// 座標から決まる0以上1未満の擬似乱数。配列の添字ではなく重心のワールド座標を
+// 種にすることで、リロードしても、簡易/詳細ティアを切り替えても、同じ建物は
+// 必ず同じ明るさになる(表示のたびに街全体の色が入れ替わるのを防ぐ)
+function hash01(x, z) {
+  let h = Math.imul(Math.round(x), 73856093) ^ Math.imul(Math.round(z), 19349663);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+// 頂点カラーに入れる明るさ(0..255)。three.jsは頂点カラーをリニア色空間の値として
+// 乗算するので、見た目(sRGB)基準で決めた倍率をリニアに直してから格納する。
+// r=g=bの中立な倍率なので、暗くしても色味(色相)はずれない
+function wallShadeByte(cx, cz) {
+  const s = WALL_SHADE_MIN + (1 - WALL_SHADE_MIN) * hash01(cx, cz);
+  return Math.round(255 * s ** 2.2);
+}
 
 function emptyLayer() {
   return { group: new THREE.Group(), count: 0, setVisible() {}, dispose() {} };
@@ -77,6 +104,12 @@ function buildWallGeometry({ pts2d, cx, cz, groundY, h }) {
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+  // 1棟まるごと同じ明るさにする。Float32ではなくUint8(正規化)で持つのは、詳細ティア
+  // (数万棟・壁の総頂点数が百万超)でのメモリを抑えるため。実測で17.6MB→4.4MBになる
+  const colors = new Uint8Array(n * 6 * 3).fill(wallShadeByte(cx, cz));
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3, true));
+
   geo.computeVertexNormals();
   geo.rotateX(-Math.PI / 2);
   geo.translate(cx, groundY, cz);
