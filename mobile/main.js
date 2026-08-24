@@ -205,8 +205,11 @@ scene.background = new THREE.Color(0x9ec8e8);
 scene.fog = new THREE.Fog(0x9ec8e8, 4000, 16000);
 
 scene.add(new THREE.HemisphereLight(0xcfe6ff, 0x54604a, 0.9));
+// 南東・仰角約20°(朝7時ごろの朝日を想定)。ワールド座標は東+X/南+Zなので、
+// X=Zの位置は方位135°(南東)になる。北半球(日本・ポーランドとも北緯)では
+// 太陽は東→南→西と弧を描くため、南側の壁が明るくなる向きにしている
 const sun = new THREE.DirectionalLight(0xfff2df, 1.6);
-sun.position.set(-3000, 5000, -2000);
+sun.position.set(4000, 2000, 4000);
 scene.add(sun);
 
 const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.5, 40000);
@@ -546,6 +549,13 @@ buildingsTierSelect.value = buildingsTier;
 buildingsTierSelect.addEventListener('change', () => {
   buildingsTier = buildingsTierSelect.value;
   localStorage.setItem(BUILDINGS_TIER_KEY, buildingsTier);
+  // 建物データを選んだのに毎回ボタンを手動でONにし直す手間をなくすため、
+  // 「なし」以外を選んだ時点で表示もONにしておく(地形読み込み完了後、
+  // 末尾のapplyBuildingsVisibility()呼び出しで実際に構築される)
+  if (buildingsTier !== 'none' && !buildingsOn) {
+    buildingsOn = true;
+    localStorage.setItem(BUILDINGS_KEY, 'on');
+  }
   renderBuildingsBtn();
 });
 
@@ -877,7 +887,7 @@ loadingEl.remove();
 
 // 前回セッションでトグルがONのまま保存されていた場合、ここで初回ロードする
 // (デフォルトOFFのユーザーはこの非同期処理自体が走らず、ロード時間・メモリとも増えない)
-applyBuildingsVisibility();
+applyBuildingsVisibility().catch((e) => console.error('[buildings] initial load failed', e));
 
 // ---- ブリーフィング(タスクシート+パイバル編集+離陸地点選択) ----
 setupWindEditor();

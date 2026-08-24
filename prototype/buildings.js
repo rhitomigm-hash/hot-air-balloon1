@@ -1,5 +1,6 @@
-// 建物の3D表現(LOD1相当の押し出しジオメトリ)。壁はオフホワイト1色を基準に、
-// 1棟ごとに明るさを少しずつ変えて単調さを消す(下のWALL_SHADE_MIN周辺を参照)。
+// 建物の3D表現(LOD1相当の押し出しジオメトリ)。壁は無彩色に近いグレーを基準に、
+// 1棟ごとに明るさを少しずつ変え(WALL_SHADE_MIN周辺)、さらに細かい濃淡ノイズの
+// テクスチャ(WALL_GRAIN_*周辺)を重ねることで、単色べた塗りの単調さを消している。
 // 屋根だけ地形と同じ航空写真テクスチャを貼る(terrain.getTileAt()でタイルの
 // materialをそのまま共有するため、地形側のLOD昇格・テクスチャ差し替えが
 // 屋根にも自動で反映される)。
@@ -13,9 +14,13 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // 壁は全棟の形状を1つのジオメトリに統合して1回で描くため、棟ごとに色を変えるには
 // 頂点カラーを使うしかない(棟ごとにmaterialを分けると統合が壊れ、ドローコールが
-// 棟数分に増えてしまう)。materialの色 × 頂点カラー で最終的な色が決まるので、
-// ここの色が「最も明るい棟の色」、頂点カラーがそこからの暗さの倍率になる
-const WALL_MATERIAL = new THREE.MeshLambertMaterial({ color: 0xf5f3ef, vertexColors: true });
+// 棟数分に増えてしまう)。materialの色 × 頂点カラー × 下のノイズテクスチャ で
+// 最終的な色が決まるので、ここの色が「最も明るい棟の、最も明るい部分の色」になる。
+// 屋根(地形の航空写真テクスチャ、グレー寄り)と並んだときに壁だけ明るい白に
+// 浮いて見えたため彩度を落としているが、単純なR=G=Bにすると朝日の暖色(下のsun参照)
+// との掛け算で実機ではRが強く出て赤みがかって見えるため、あらかじめ少し寒色
+// (B>R)寄りにして相殺している
+const WALL_MATERIAL = new THREE.MeshLambertMaterial({ color: 0xa0a4a8, vertexColors: true });
 
 // 明るさのばらつきの下限(見た目=sRGB基準の倍率。1.0でベース色そのまま)。
 // 0.82なら中央値0.91を挟んでおよそ±10%の幅になる
@@ -36,6 +41,66 @@ function hash01(x, z) {
 function wallShadeByte(cx, cz) {
   const s = WALL_SHADE_MIN + (1 - WALL_SHADE_MIN) * hash01(cx, cz);
   return Math.round(255 * s ** 2.2);
+}
+
+// 壁面がのっぺり(単色べた塗り)に見えるのを避けるための、ごく細かい濃淡ノイズ。
+// 棟ごとの明るさ(頂点カラー、上のwallShadeByte)とは別の層として、材質のテクスチャ
+// (map)にタイル張りの手続き型ノイズ画像を貼る。頂点数を増やさずに済むうえ、
+// 建物の大きさに関係なく実寸(m)基準でタイリングするので、大きな建物でも
+// 引き伸ばされて見えることがない
+const WALL_GRAIN_SCALE = 4; // ノイズが1回タイリングする物理サイズ(m)。大きな壁面でも
+// タイルの繰り返しが目立たない程度に大きめにしている
+const WALL_GRAIN_MEAN = 0.95; // 見た目(sRGB)基準の平均倍率
+const WALL_GRAIN_AMOUNT = 0.035; // 平均からの振れ幅(パターンとして認識されないよう控えめに)
+
+// gridN×gridNの格子点(トーラス状、端が反対側の端とつながる)を双一次補間する値ノイズ。
+// 端をmod演算で折り返すことで、タイル境界に継ぎ目が出ない(継ぎ目があると、その線が
+// RepeatWrapping先で規則的なグリッド模様として目立ってしまうため重要)
+function makeSeamlessNoiseSampler(gridN) {
+  const grid = new Float32Array(gridN * gridN);
+  for (let i = 0; i < grid.length; i++) grid[i] = Math.random();
+  return (u, v) => {
+    const gx = u * gridN, gy = v * gridN;
+    const x0 = Math.floor(gx), y0 = Math.floor(gy);
+    const fx = gx - x0, fy = gy - y0;
+    const xi0 = ((x0 % gridN) + gridN) % gridN, yi0 = ((y0 % gridN) + gridN) % gridN;
+    const xi1 = (xi0 + 1) % gridN, yi1 = (yi0 + 1) % gridN;
+    const v00 = grid[yi0 * gridN + xi0], v10 = grid[yi0 * gridN + xi1];
+    const v01 = grid[yi1 * gridN + xi0], v11 = grid[yi1 * gridN + xi1];
+    const a = v00 + (v10 - v00) * fx, b = v01 + (v11 - v01) * fx;
+    return a + (b - a) * fy;
+  };
+}
+
+function createWallGrainTexture() {
+  const SIZE = 128;
+  // 粗い濃淡(周波数5)と細かい粒立ち(周波数13)を重ねて、単純な繰り返しに見えにくくする
+  const coarse = makeSeamlessNoiseSampler(5);
+  const fine = makeSeamlessNoiseSampler(13);
+
+  const cvs = document.createElement('canvas');
+  cvs.width = cvs.height = SIZE;
+  const ctx = cvs.getContext('2d');
+  const img = ctx.createImageData(SIZE, SIZE);
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      const u = x / SIZE, v = y / SIZE;
+      const n = coarse(u, v) * 0.65 + fine(u, v) * 0.35; // 両方0..1なので加重和も0..1のまま
+
+      const shade = Math.min(1, Math.max(0, WALL_GRAIN_MEAN + (n - 0.5) * 2 * WALL_GRAIN_AMOUNT));
+      const idx = (y * SIZE + x) * 4;
+      img.data[idx] = img.data[idx + 1] = img.data[idx + 2] = Math.round(255 * shade);
+      img.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+
+  const tex = new THREE.CanvasTexture(cvs);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  // ここに書き込んだ値は見た目(sRGB)基準の輝度なので、そう明示することで
+  // three.js側にリニア変換を任せる(頂点カラーのように手動でpow(2.2)する必要がない)
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
 }
 
 function emptyLayer() {
@@ -89,10 +154,18 @@ function placeBuilding(footprint, height, terrain) {
 function buildWallGeometry({ pts2d, cx, cz, groundY, h }) {
   const n = pts2d.length;
   const positions = new Float32Array(n * 6 * 3); // 1辺あたり2三角形×3頂点×3成分
-  let vi = 0;
+  const uvs = new Float32Array(n * 6 * 2);
+  let vi = 0, ui = 0;
+  let arc = 0; // 壁沿いの累積距離(m)。ノイズテクスチャのUVをこれで張るので、
+  // 建物の大きさや辺の長さによらず、実寸で一定のタイル幅になる(RepeatWrappingで繰り返す)
   for (let i = 0; i < n; i++) {
     const [x0, y0] = pts2d[i];
     const [x1, y1] = pts2d[(i + 1) % n];
+    const edgeLen = Math.hypot(x1 - x0, y1 - y0);
+    const u0 = arc / WALL_GRAIN_SCALE, u1 = (arc + edgeLen) / WALL_GRAIN_SCALE;
+    const v0 = 0, v1 = h / WALL_GRAIN_SCALE;
+    arc += edgeLen;
+
     // A=床(p0) B=床(p1) C=天井(p1) D=天井(p0)。pts2dはCCWなので、この頂点順(A,B,D)
     // と(B,C,D)はどちらも外向き法線になる(cross(B-A,D-A)=cross(C-B,D-B)=h*(dy,-dx,0))
     positions[vi++] = x0; positions[vi++] = y0; positions[vi++] = 0;
@@ -101,9 +174,17 @@ function buildWallGeometry({ pts2d, cx, cz, groundY, h }) {
     positions[vi++] = x1; positions[vi++] = y1; positions[vi++] = 0;
     positions[vi++] = x1; positions[vi++] = y1; positions[vi++] = h;
     positions[vi++] = x0; positions[vi++] = y0; positions[vi++] = h;
+
+    uvs[ui++] = u0; uvs[ui++] = v0;
+    uvs[ui++] = u1; uvs[ui++] = v0;
+    uvs[ui++] = u0; uvs[ui++] = v1;
+    uvs[ui++] = u1; uvs[ui++] = v0;
+    uvs[ui++] = u1; uvs[ui++] = v1;
+    uvs[ui++] = u0; uvs[ui++] = v1;
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
 
   // 1棟まるごと同じ明るさにする。Float32ではなくUint8(正規化)で持つのは、詳細ティア
   // (数万棟・壁の総頂点数が百万超)でのメモリを抑えるため。実測で17.6MB→4.4MBになる
@@ -139,17 +220,46 @@ function buildRoofGeometry({ pts2d, cx, cz, groundY, h }, tile, tileMeters) {
   return geo;
 }
 
+// フライト開始直後は地形タイル読み込みと帯域を奪い合うため、建物データの取得が
+// 一時的に失敗しやすい。404(そのエリアのデータが実際に無い)以外は通信の一時的な
+// 失敗とみなして再試行する(terrain.jsのfetchBitmapRetryと同じ考え方)
+async function fetchBuildingsJson(url, attempts = 3) {
+  let lastErr;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        const err = new Error(`buildings fetch failed: ${res.status} ${url}`);
+        err.status = res.status;
+        throw err;
+      }
+      return await res.json();
+    } catch (e) {
+      lastErr = e;
+      if (e && e.status && e.status < 500 && e.status !== 429) throw e;
+      if (i < attempts - 1) await new Promise((r) => setTimeout(r, 300 * (i + 1)));
+    }
+  }
+  throw lastErr;
+}
+
 // areaId: PRESET_AREASの id。tier: 'simple'(軽量・4G/低スペック向け)または'detailed'
 // (高密度・Wi-Fi推奨)。データが無い/取得失敗なら建物0棟の空レイヤーを返す(フェイルセーフ)
 export async function buildBuildings(areaId, tier, terrain, onProgress) {
   if (!areaId || (tier !== 'simple' && tier !== 'detailed')) return emptyLayer();
 
+  // ノイズテクスチャの生成にはcanvas(document)が要る。実行時(ブラウザ)まで
+  // 遅延させることで、このモジュール自体はNode等のdocument無し環境でも
+  // 安全にimportできるようにしておく
+  if (typeof document !== 'undefined' && !WALL_MATERIAL.map) {
+    WALL_MATERIAL.map = createWallGrainTexture();
+    WALL_MATERIAL.needsUpdate = true;
+  }
+
   const suffix = tier === 'simple' ? '-simple' : '';
   let data;
   try {
-    const res = await fetch(`./data/buildings/${areaId}${suffix}.json`);
-    if (!res.ok) return emptyLayer();
-    data = await res.json();
+    data = await fetchBuildingsJson(`./data/buildings/${areaId}${suffix}.json`);
   } catch {
     return emptyLayer();
   }
@@ -182,30 +292,38 @@ export async function buildBuildings(areaId, tier, terrain, onProgress) {
 
   if (wallGeometries.length === 0) return emptyLayer();
 
-  const group = new THREE.Group();
+  // ここから先で予期しない例外(mergeGeometries失敗等)が起きると、呼び出し元の
+  // main.jsでは捕捉されず、建物が二度と表示されないまま(オフオンで再試行しても
+  // 直らない)状態になりうるため、フェイルセーフとして空レイヤーにフォールバックする
+  try {
+    const group = new THREE.Group();
 
-  const mergedWalls = mergeGeometries(wallGeometries, false);
-  for (const geo of wallGeometries) geo.dispose();
-  group.add(new THREE.Mesh(mergedWalls, WALL_MATERIAL));
+    const mergedWalls = mergeGeometries(wallGeometries, false);
+    for (const geo of wallGeometries) geo.dispose();
+    group.add(new THREE.Mesh(mergedWalls, WALL_MATERIAL));
 
-  // 屋根はタイル単位(=地形と同じ写真テクスチャを共有するmaterial単位)でまとめて1メッシュずつ追加
-  const roofMeshes = [];
-  for (const { mat, geos } of roofGroups.values()) {
-    const mergedRoof = mergeGeometries(geos, false);
-    for (const geo of geos) geo.dispose();
-    const mesh = new THREE.Mesh(mergedRoof, mat); // matは地形タイルの共有material(disposeしない)
-    roofMeshes.push(mesh);
-    group.add(mesh);
+    // 屋根はタイル単位(=地形と同じ写真テクスチャを共有するmaterial単位)でまとめて1メッシュずつ追加
+    const roofMeshes = [];
+    for (const { mat, geos } of roofGroups.values()) {
+      const mergedRoof = mergeGeometries(geos, false);
+      for (const geo of geos) geo.dispose();
+      const mesh = new THREE.Mesh(mergedRoof, mat); // matは地形タイルの共有material(disposeしない)
+      roofMeshes.push(mesh);
+      group.add(mesh);
+    }
+
+    return {
+      group,
+      count,
+      setVisible(v) { group.visible = v; },
+      dispose() {
+        mergedWalls.dispose();
+        for (const mesh of roofMeshes) mesh.geometry.dispose(); // materialは地形側が所有するため触らない
+        group.clear();
+      },
+    };
+  } catch (e) {
+    console.error('[buildings] geometry build failed', e);
+    return emptyLayer();
   }
-
-  return {
-    group,
-    count,
-    setVisible(v) { group.visible = v; },
-    dispose() {
-      mergedWalls.dispose();
-      for (const mesh of roofMeshes) mesh.geometry.dispose(); // materialは地形側が所有するため触らない
-      group.clear();
-    },
-  };
 }
