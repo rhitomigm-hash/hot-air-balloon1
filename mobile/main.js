@@ -194,8 +194,32 @@ function groundWindActual(tSec) {
   return { dir, kt };
 }
 
+// ---- 低スペック(端末クラス)判定 ----
+// iOS Safariにはnavigator.deviceMemoryが無く、hardwareConcurrencyも新旧iPhoneで
+// 同じ値を返すため、JSから機種を精密に見分ける手段が無い。判定を誤って強い端末まで
+// 低スペック扱いにする方を許容し、非力な端末を取りこぼす方を避ける設計とし、
+// iPhone/iPadと判定できた端末は一律低スペック扱いにする(既定ON)。
+// 明示的に上書きしたい場合は`?lowspec=0/1`(QA用)、または設定パネルの「軽量設定」ボタン
+// で永続的に上書きできる(こちらは反映のためページを再読み込みする)
+const LOWSPEC_KEY = 'balloon-lowspec-override'; // '1' | '0' | 未設定なら自動判定に従う
+function detectLowSpecDevice() {
+  const q = new URLSearchParams(location.search).get('lowspec');
+  if (q === '1') return true;
+  if (q === '0') return false;
+  const saved = localStorage.getItem(LOWSPEC_KEY);
+  if (saved === '1') return true;
+  if (saved === '0') return false;
+  const lowMemory = 'deviceMemory' in navigator && navigator.deviceMemory <= 4; // Android/Chromeのみ有効
+  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+  return lowMemory || isIOS;
+}
+const isLowSpec = detectLowSpecDevice();
+
 // ---- three.js セットアップ ----
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({
+  antialias: !isLowSpec,
+  powerPreference: isLowSpec ? 'low-power' : undefined,
+});
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 document.getElementById('app').appendChild(renderer.domElement);
@@ -544,6 +568,17 @@ buildingsBtn.addEventListener('click', async () => {
   await applyBuildingsVisibility();
 });
 
+// ---- 低スペック向け軽量設定のオン/オフ切替(設定パネルのボタン) ----
+// レンダラーのアンチエイリアス設定・地形LOD上限は起動時に一度だけ決まるため、
+// ここでの切替は即座には反映できない。上書き値を保存してページを再読み込みすることで
+// 反映する(既存の`?lowspec=`URLパラメータと同じ「次回読み込みから反映」という設計に合わせた)
+const lowspecBtn = document.getElementById('btn-lowspec');
+lowspecBtn.textContent = isLowSpec ? t('btn.lowspecOn') : t('btn.lowspecOff');
+lowspecBtn.addEventListener('click', () => {
+  localStorage.setItem(LOWSPEC_KEY, isLowSpec ? '0' : '1');
+  location.reload();
+});
+
 const buildingsTierSelect = document.getElementById('buildings-tier-select');
 buildingsTierSelect.value = buildingsTier;
 buildingsTierSelect.addEventListener('change', () => {
@@ -880,7 +915,8 @@ loadingEl.style.display = '';
 
 const loadEl = document.getElementById('load-progress');
 const terrain = await buildTerrain(AREA.lon, AREA.lat, TILE_RADIUS,
-  (done, total) => { loadEl.textContent = `${done} / ${total}`; });
+  (done, total) => { loadEl.textContent = `${done} / ${total}`; },
+  { enableUltra: !isLowSpec, hiresMax: isLowSpec ? 6 : 12 });
 scene.add(terrain.group);
 terrainReady = true;
 loadingEl.remove();

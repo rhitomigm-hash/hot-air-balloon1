@@ -16,14 +16,22 @@ export function lonLatToTile(lon, lat, z) {
   return { x, y };
 }
 
+const FETCH_TIMEOUT_MS = 10000; // 通信が失敗ではなく無応答のまま止まった場合に備えるタイムアウト
+
 async function fetchBitmap(url) {
-  const res = await fetch(url);
-  if (!res.ok) {
-    const err = new Error(`tile fetch failed: ${res.status} ${url}`);
-    err.status = res.status;
-    throw err;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal });
+    if (!res.ok) {
+      const err = new Error(`tile fetch failed: ${res.status} ${url}`);
+      err.status = res.status;
+      throw err;
+    }
+    return await createImageBitmap(await res.blob());
+  } finally {
+    clearTimeout(timer);
   }
-  return createImageBitmap(await res.blob());
 }
 
 // 404(タイルが本当に存在しない、海上等)以外は通信の一時的な失敗とみなし再試行する
@@ -61,7 +69,8 @@ function decodeDem(bitmap) {
 
 // centerLon/Lat を原点に、(2*radius+1)^2 枚の DEM タイルで地形グループを作る。
 // 戻り値: { group, getHeight(x,z), tileMeters, sizeMeters }
-export async function buildTerrain(centerLon, centerLat, radius, onProgress) {
+export async function buildTerrain(centerLon, centerLat, radius, onProgress, options = {}) {
+  const { enableUltra = true, hiresMax = 12 } = options;
   const c = lonLatToTile(centerLon, centerLat, DEM_Z);
   const latRad = (centerLat * Math.PI) / 180;
   // メルカトルの緯度伸長を打ち消して「実距離のメートル」で組む
@@ -193,7 +202,7 @@ export async function buildTerrain(centerLon, centerLat, radius, onProgress) {
   // --- 低高度向け高解像度テクスチャ(z16 ≒ 2m/px)への段階アップグレード ---
   const HIRES_Z = 16;
   const HIRES_RADIUS = 3000; // この距離内のタイルを対象(m)
-  const HIRES_MAX = 12;      // メモリ保護のための上限枚数
+  const HIRES_MAX = hiresMax; // メモリ保護のための上限枚数(低スペック端末向けに絞れる)
   let hiCount = 0;
   let upgradingCount = 0;
 
@@ -226,8 +235,39 @@ export async function buildTerrain(centerLon, centerLat, radius, onProgress) {
     if (old) old.dispose();
   }
 
-  function startUpgrade(entry, force) {
-    if (!entry || entry.level || (!force && hiCount >= HIRES_MAX)) return;
+  // hiCount が上限に達している時、candidateDist より遠いhires済みタイルがあれば
+  // それを1枚追い出して低解像度に戻す(枠を空ける)。追い出せなければfalse
+  function evictFarthestHiresTile(candidateDist) {
+    let farthest = null, farthestD = -Infinity;
+    for (const t of tileEntries) {
+      if (!t.level || t === ultraEntry) continue; // ultraEntry(現在z17)は追い出し対象外
+      const d = t.hiDist ?? 0;
+      if (d > farthestD) { farthestD = d; farthest = t; }
+    }
+    if (!farthest || farthestD <= candidateDist) return false;
+    downgradeTile(farthest);
+    return true;
+  }
+
+  // hires(z16)タイルを低解像度に戻す(z16→z17前提の強制取得でも上限12枚を超えないようにするため)
+  function downgradeTile(entry) {
+    entry.level = 0;
+    entry.hiApplied = false;
+    hiCount--;
+    const oldTex = entry.mat.map;
+    loadPhotoTexture(entry.tx, entry.ty).then((tex) => {
+      if (entry.level) { tex.dispose(); return; } // 追い出した後にまた昇格済みなら不要
+      entry.mat.map = tex;
+      entry.mat.color.set(0xffffff);
+      entry.mat.needsUpdate = true;
+      if (oldTex) oldTex.dispose();
+    }).catch(() => {});
+  }
+
+  function startUpgrade(entry, candidateDist = 0) {
+    if (!entry || entry.level) return;
+    // 上限に達していれば、より遠いタイルを1枚追い出してから昇格する(枠を空けられなければ諦める)
+    if (hiCount >= HIRES_MAX && !evictFarthestHiresTile(candidateDist)) return;
     entry.level = 1;
     hiCount++;
     upgradingCount++;
@@ -239,11 +279,11 @@ export async function buildTerrain(centerLon, centerLat, radius, onProgress) {
     if (upgradingCount > 0) return;
     let best = null, bestD = Infinity;
     for (const t of tileEntries) {
-      if (t.level) continue;
       const d = Math.hypot(t.cx - x, t.cz - z);
+      if (t.level) { t.hiDist = d; continue; } // 既にhires済み: 追い出し判定用に距離だけ更新
       if (d < bestD) { bestD = d; best = t; }
     }
-    if (best && bestD < HIRES_RADIUS) startUpgrade(best);
+    if (best && bestD < HIRES_RADIUS) startUpgrade(best, bestD);
   }
 
   // 指定地点を含むタイルを即時アップグレード(離陸地点・ターゲット用)
@@ -260,6 +300,7 @@ export async function buildTerrain(centerLon, centerLat, radius, onProgress) {
   let ultraLoading = false;
 
   async function requestUltra(x, z) {
+    if (!enableUltra) return; // 低スペック端末向け: z17(4096px)への昇格自体を行わない
     const dbg = document.documentElement.dataset; // デバッグ確認用(あとで消す)
     if (ultraLoading) { dbg.ultraState = 'loading'; return; }
     const h = tileMeters / 2;
@@ -267,7 +308,7 @@ export async function buildTerrain(centerLon, centerLat, radius, onProgress) {
       (t) => Math.abs(x - t.cx) <= h && Math.abs(t.cz - z) <= h);
     if (!entry) { dbg.ultraState = 'no-entry'; return; }
     if (entry === ultraEntry) { dbg.ultraState = 'already'; return; }
-    if (!entry.hiApplied) { dbg.ultraState = 'wait-z16'; startUpgrade(entry, true); return; } // 先にz16を確保
+    if (!entry.hiApplied) { dbg.ultraState = 'wait-z16'; startUpgrade(entry, 0); return; } // 先にz16を確保(上限超過時は他の遠いタイルを追い出す)
     dbg.ultraState = 'building';
     ultraLoading = true;
     try {

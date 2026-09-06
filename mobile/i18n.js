@@ -161,6 +161,8 @@ const STR = {
     'opts.panelTitle': '操作設定',
     'opts.soundSectionLabel': '音',
     'opts.buildingsSectionLabel': '建物',
+    'opts.lowSpecSectionLabel': '軽量設定',
+    'opts.lowSpecHint': '変更すると再読み込みされます。iPhone/iPadは既定でONです。',
     'pibal.launchTimeNote': ' (離陸時)',
 
     'btn.burnerHtml': '🔥<br>バーナー',
@@ -174,6 +176,8 @@ const STR = {
     'btn.soundOff': '音 OFF',
     'btn.buildingsOn': '建物 ON',
     'btn.buildingsOff': '建物 OFF',
+    'btn.lowspecOn': '軽量設定 ON',
+    'btn.lowspecOff': '軽量設定 OFF',
 
     'help.bodyHtml':
       '<b>Space</b> バーナー(長押し) <b>R</b> リップライン(長押し) <b>M</b> マーカー投下<br>' +
@@ -397,6 +401,8 @@ const STR = {
     'opts.panelTitle': 'Control Options',
     'opts.soundSectionLabel': 'Sound',
     'opts.buildingsSectionLabel': 'Buildings',
+    'opts.lowSpecSectionLabel': 'Lightweight mode',
+    'opts.lowSpecHint': 'Changing this reloads the page. Defaults to ON on iPhone/iPad.',
     'pibal.launchTimeNote': ' (at launch)',
 
     'btn.burnerHtml': '🔥<br>Burner',
@@ -410,6 +416,8 @@ const STR = {
     'btn.soundOff': 'Sound OFF',
     'btn.buildingsOn': 'Buildings ON',
     'btn.buildingsOff': 'Buildings OFF',
+    'btn.lowspecOn': 'Lightweight ON',
+    'btn.lowspecOff': 'Lightweight OFF',
 
     'help.bodyHtml':
       '<b>Space</b> Burner (hold) <b>R</b> Rip line (hold) <b>M</b> Drop marker<br>' +
@@ -635,6 +643,8 @@ const STR = {
     'opts.panelTitle': 'Opções de Controle',
     'opts.soundSectionLabel': 'Som',
     'opts.buildingsSectionLabel': 'Prédios',
+    'opts.lowSpecSectionLabel': 'Modo leve',
+    'opts.lowSpecHint': 'A alteração recarrega a página. Ativado por padrão em iPhone/iPad.',
     'pibal.launchTimeNote': ' (na decolagem)',
 
     'btn.burnerHtml': '🔥<br>Queimador',
@@ -648,6 +658,8 @@ const STR = {
     'btn.soundOff': 'Som DESLIGADO',
     'btn.buildingsOn': 'Prédios LIGADO',
     'btn.buildingsOff': 'Prédios DESLIGADO',
+    'btn.lowspecOn': 'Modo leve LIGADO',
+    'btn.lowspecOff': 'Modo leve DESLIGADO',
 
     'help.bodyHtml':
       '<b>Espaço</b> Queimador (segurar) <b>R</b> Respiro (segurar) <b>M</b> Lançar marcador<br>' +
@@ -871,6 +883,8 @@ const STR = {
     'opts.panelTitle': 'Opcje sterowania',
     'opts.soundSectionLabel': 'Dźwięk',
     'opts.buildingsSectionLabel': 'Budynki',
+    'opts.lowSpecSectionLabel': 'Tryb oszczędny',
+    'opts.lowSpecHint': 'Zmiana odświeży stronę. Domyślnie WŁ na iPhone/iPad.',
     'pibal.launchTimeNote': ' (przy starcie)',
 
     'btn.burnerHtml': '🔥<br>Palnik',
@@ -884,6 +898,8 @@ const STR = {
     'btn.soundOff': 'Dźwięk WYŁ',
     'btn.buildingsOn': 'Budynki WŁ',
     'btn.buildingsOff': 'Budynki WYŁ',
+    'btn.lowspecOn': 'Tryb oszczędny WŁ',
+    'btn.lowspecOff': 'Tryb oszczędny WYŁ',
 
     'help.bodyHtml':
       '<b>Spacja</b> Palnik (przytrzymaj) <b>R</b> Odpowietrznik (przytrzymaj) <b>M</b> Zrzuć znacznik<br>' +
@@ -1107,6 +1123,8 @@ const STR = {
     'opts.panelTitle': 'Options de contrôle',
     'opts.soundSectionLabel': 'Son',
     'opts.buildingsSectionLabel': 'Bâtiments',
+    'opts.lowSpecSectionLabel': 'Mode allégé',
+    'opts.lowSpecHint': 'Ce changement recharge la page. Activé par défaut sur iPhone/iPad.',
     'pibal.launchTimeNote': ' (au décollage)',
 
     'btn.burnerHtml': '🔥<br>Brûleur',
@@ -1120,6 +1138,8 @@ const STR = {
     'btn.soundOff': 'Son DÉSACTIVÉ',
     'btn.buildingsOn': 'Bâtiments ACTIVÉS',
     'btn.buildingsOff': 'Bâtiments DÉSACTIVÉS',
+    'btn.lowspecOn': 'Mode allégé ACTIVÉ',
+    'btn.lowspecOff': 'Mode allégé DÉSACTIVÉ',
 
     'help.bodyHtml':
       '<b>Espace</b> Brûleur (maintenir) <b>R</b> Évent (maintenir) <b>M</b> Larguer le marqueur<br>' +
@@ -1343,6 +1363,8 @@ const STR = {
     'opts.panelTitle': 'Steuerungsoptionen',
     'opts.soundSectionLabel': 'Ton',
     'opts.buildingsSectionLabel': 'Gebäude',
+    'opts.lowSpecSectionLabel': 'Sparmodus',
+    'opts.lowSpecHint': 'Die Änderung lädt die Seite neu. Auf iPhone/iPad standardmäßig AN.',
     'pibal.launchTimeNote': ' (beim Start)',
 
     'btn.burnerHtml': '🔥<br>Brenner',
@@ -1356,6 +1378,8 @@ const STR = {
     'btn.soundOff': 'Ton AUS',
     'btn.buildingsOn': 'Gebäude AN',
     'btn.buildingsOff': 'Gebäude AUS',
+    'btn.lowspecOn': 'Sparmodus AN',
+    'btn.lowspecOff': 'Sparmodus AUS',
 
     'help.bodyHtml':
       '<b>Leertaste</b> Brenner (halten) <b>R</b> Ablassleine (halten) <b>M</b> Marker abwerfen<br>' +
@@ -1579,6 +1603,8 @@ const STR = {
     'opts.panelTitle': 'Opciones de control',
     'opts.soundSectionLabel': 'Sonido',
     'opts.buildingsSectionLabel': 'Edificios',
+    'opts.lowSpecSectionLabel': 'Modo ligero',
+    'opts.lowSpecHint': 'El cambio recarga la página. Activado por defecto en iPhone/iPad.',
     'pibal.launchTimeNote': ' (al despegar)',
 
     'btn.burnerHtml': '🔥<br>Quemador',
@@ -1592,6 +1618,8 @@ const STR = {
     'btn.soundOff': 'Sonido DESACTIVADO',
     'btn.buildingsOn': 'Edificios ACTIVADOS',
     'btn.buildingsOff': 'Edificios DESACTIVADOS',
+    'btn.lowspecOn': 'Modo ligero ACTIVADO',
+    'btn.lowspecOff': 'Modo ligero DESACTIVADO',
 
     'help.bodyHtml':
       '<b>Espacio</b> Quemador (mantener) <b>R</b> Cuerda de venteo (mantener) <b>M</b> Lanzar marcador<br>' +
