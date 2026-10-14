@@ -153,6 +153,14 @@ const STR = {
       'ご寄付も受け付けています。ご寄付いただいた方には、世界選手権の開催地' +
       'クロスノの実在地形で飛べる<b>特別版アプリ</b>をお届けします。',
     'support.instaBtn': '寄付のご案内はInstagramへ',
+    // 2026-10-15 0:00(日本時間)以降に表示する応援欄(index.html の data-from)
+    'supportNext.title': '🎈 熱気球フライトを応援しよう!',
+    'supportNext.text':
+      'これまでの多大なご声援、そして応援Tシャツへのたくさんのお申し込みに心から感謝いたします。<br>' +
+      '今後は、サーバーの維持と新しいエリア・機能の開発にかかる費用の一部を、' +
+      '世界各地のフライトエリアを収録した有料の<b>サポーター版</b>のご購入という形でお願いすることにしました。' +
+      '購入ページは近日公開します。',
+    'supportNext.instaBtn': '最新情報はInstagramへ',
 
     'pibal.panelTitle': 'パイバル観測データ',
     'pibal.note': '高度: 対地(AGL) / 風向: <span id="pibal-mode-label">FROM</span>(磁方位)',
@@ -393,6 +401,14 @@ const STR = {
       'Donations are also welcome. Donors receive a <b>special edition app</b> where you can fly ' +
       'over the real terrain of Krosno, the World Championship host city.',
     'support.instaBtn': 'Donation info on Instagram',
+    // 2026-10-15 0:00(日本時間)以降に表示する応援欄(index.html の data-from)
+    'supportNext.title': '🎈 Support Hot Air Balloon Flight!',
+    'supportNext.text':
+      'Thank you so much for all your tremendous support, and for your many support T-shirt orders.<br>' +
+      'From now on, we are asking for support toward server and development costs ' +
+      'through purchases of the paid <b>Supporter Edition</b>, with flight areas from around the world. ' +
+      'The purchase page is coming soon.',
+    'supportNext.instaBtn': 'Latest news on Instagram',
 
     'pibal.panelTitle': 'Pibal Observation Data',
     'pibal.note': 'Alt: AGL / Dir: <span id="pibal-mode-label">FROM</span> (magnetic)',
@@ -635,6 +651,14 @@ const STR = {
       'Doações também são bem-vindas. Doadores recebem um <b>aplicativo especial</b> em que você pode voar ' +
       'sobre o terreno real de Krosno, a cidade-sede do Campeonato Mundial.',
     'support.instaBtn': 'Informações de doação no Instagram',
+    // 2026-10-15 0:00(日本時間)以降に表示する応援欄(index.html の data-from)
+    'supportNext.title': '🎈 Apoie o Hot Air Balloon Flight!',
+    'supportNext.text':
+      'Muito obrigado por todo o enorme apoio e pelos muitos pedidos de camisetas de apoio.<br>' +
+      'A partir de agora, pedimos apoio aos custos de servidor e desenvolvimento ' +
+      'por meio da compra da <b>Edição Apoiador</b> paga, com áreas de voo do mundo todo. ' +
+      'A página de compra estará disponível em breve.',
+    'supportNext.instaBtn': 'Novidades no Instagram',
 
     'pibal.panelTitle': 'Dados de Sondagem (Pibal)',
     'pibal.note': 'Alt: solo (AGL) / Dir: <span id="pibal-mode-label">FROM</span> (magnética)',
@@ -875,6 +899,14 @@ const STR = {
       'Darowizny są również mile widziane. Darczyńcy otrzymują <b>specjalną wersję aplikacji</b>, w której można latać ' +
       'nad prawdziwym terenem Krosna, miasta-gospodarza Mistrzostw Świata.',
     'support.instaBtn': 'Informacje o darowiznach na Instagramie',
+    // 2026-10-15 0:00(日本時間)以降に表示する応援欄(index.html の data-from)
+    'supportNext.title': '🎈 Wesprzyj Hot Air Balloon Flight!',
+    'supportNext.text':
+      'Serdecznie dziękujemy za ogromne wsparcie oraz liczne zamówienia koszulek kibica.<br>' +
+      'Od teraz prosimy o wsparcie kosztów serwerów i rozwoju ' +
+      'poprzez zakup płatnej <b>wersji Supporter</b> z obszarami lotów z całego świata. ' +
+      'Strona zakupu pojawi się wkrótce.',
+    'supportNext.instaBtn': 'Najnowsze informacje na Instagramie',
 
     'pibal.panelTitle': 'Dane Sondażu Pilotowego',
     'pibal.note': 'Wys.: nad ziemią (AGL) / Kier.: <span id="pibal-mode-label">FROM</span> (magnetyczny)',
@@ -1115,6 +1147,14 @@ const STR = {
       'Les dons sont également les bienvenus. Les donateurs reçoivent une <b>application spéciale</b> permettant de voler ' +
       'au-dessus du terrain réel de Krosno, ville hôte du Championnat du monde.',
     'support.instaBtn': 'Infos sur les dons sur Instagram',
+    // 2026-10-15 0:00(日本時間)以降に表示する応援欄(index.html の data-from)
+    'supportNext.title': '🎈 Soutenez Hot Air Balloon Flight !',
+    'supportNext.text':
+      'Merci infiniment pour vos encouragements et pour vos nombreuses commandes de T-shirts de soutien.<br>' +
+      'Désormais, nous vous proposons de soutenir les frais de serveur et de développement ' +
+      "en achetant l'<b>édition Supporter</b> payante, avec des zones de vol du monde entier. " +
+      "La page d'achat sera bientôt disponible.",
+    'supportNext.instaBtn': 'Actualités sur Instagram',
 
     'pibal.panelTitle': 'Données de sondage pibal',
     'pibal.note': 'Alt : sol (AGL) / Dir : <span id="pibal-mode-label">FROM</span> (magnétique)',
@@ -1355,6 +1395,14 @@ const STR = {
       'Spenden sind ebenfalls willkommen. Spender erhalten eine <b>Sonderversion der App</b>, in der man ' +
       'über das echte Gelände von Krosno, der Gastgeberstadt der Weltmeisterschaft, fliegen kann.',
     'support.instaBtn': 'Spendeninfo auf Instagram',
+    // 2026-10-15 0:00(日本時間)以降に表示する応援欄(index.html の data-from)
+    'supportNext.title': '🎈 Unterstütze Hot Air Balloon Flight!',
+    'supportNext.text':
+      'Vielen Dank für die großartige Unterstützung und die vielen Bestellungen von Fan-T-Shirts.<br>' +
+      'Ab jetzt bitten wir um Unterstützung der Server- und Entwicklungskosten ' +
+      'durch den Kauf der kostenpflichtigen <b>Supporter-Edition</b> mit Fluggebieten aus aller Welt. ' +
+      'Die Kaufseite folgt in Kürze.',
+    'supportNext.instaBtn': 'Neuigkeiten auf Instagram',
 
     'pibal.panelTitle': 'Pibal-Messdaten',
     'pibal.note': 'Höhe: ü. Grund (AGL) / Richt.: <span id="pibal-mode-label">FROM</span> (magnetisch)',
@@ -1595,6 +1643,14 @@ const STR = {
       'También se aceptan donaciones. Los donantes reciben una <b>aplicación especial</b> con la que se puede volar ' +
       'sobre el terreno real de Krosno, la ciudad anfitriona del Campeonato Mundial.',
     'support.instaBtn': 'Información sobre donaciones en Instagram',
+    // 2026-10-15 0:00(日本時間)以降に表示する応援欄(index.html の data-from)
+    'supportNext.title': '🎈 ¡Apoya Hot Air Balloon Flight!',
+    'supportNext.text':
+      'Muchas gracias por todo el enorme apoyo recibido y por los numerosos pedidos de camisetas de apoyo.<br>' +
+      'A partir de ahora, pedimos apoyo para los costes de servidores y desarrollo ' +
+      'mediante la compra de la <b>edición Supporter</b> de pago, con zonas de vuelo de todo el mundo. ' +
+      'La página de compra estará disponible pronto.',
+    'supportNext.instaBtn': 'Novedades en Instagram',
 
     'pibal.panelTitle': 'Datos de Sondeo Pibal',
     'pibal.note': 'Alt.: sobre el suelo (AGL) / Dir.: <span id="pibal-mode-label">FROM</span> (magnética)',
