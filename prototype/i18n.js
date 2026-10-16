@@ -165,12 +165,15 @@ const STR = {
       'クロスノの実在地形で飛べる<b>特別版アプリ</b>をお届けします。',
     'support.instaBtn': '寄付のご案内はInstagramへ',
     // 2026-10-15 0:00(日本時間)以降に表示する応援欄(index.html の data-from)
-    'supportNext.title': '🎈 熱気球フライトを応援しよう!',
+    'supportNext.title': "🎈 サポーター版、販売開始!",
     'supportNext.text':
-      'これまでの多大なご声援、そして応援Tシャツへのたくさんのお申し込みに心から感謝いたします。<br>' +
-      '今後は、サーバーの維持と新しいエリア・機能の開発にかかる費用の一部を、' +
-      '世界各地のフライトエリアを収録した有料の<b>サポーター版</b>のご購入という形でお願いすることにしました。' +
-      '購入ページは近日公開します。',
+      "これまでの多大なご声援、そして応援Tシャツへのたくさんのお申し込みに心から感謝いたします。<br>" +
+      "今後は、サーバーの維持と新しいエリア・機能の開発にかかる費用の一部を、" +
+      "有料の<b>サポーター版</b>のご購入という形でお願いすることにしました。" +
+      "サポーター版では、ポーランド・イギリス・フランス・アメリカ・ブラジル・日本の16か所のフライトエリアと、" +
+      "新しい観客モードをお楽しみいただけます(1回払い・1年間)。",
+    'supportNext.buyBtn': "サポーター版のご案内・お申し込み",
+    'supportNext.buyUrl': "https://balloon-supporters-guest.rnogamigm.workers.dev/support/",
     'supportNext.instaBtn': '最新情報はInstagramへ',
 
     'pibal.panelTitle': 'パイバル観測データ',
@@ -400,12 +403,15 @@ const STR = {
       'over the real terrain of Krosno, the World Championship host city.',
     'support.instaBtn': 'Donation info on Instagram',
     // 2026-10-15 0:00(日本時間)以降に表示する応援欄(index.html の data-from)
-    'supportNext.title': '🎈 Support Hot Air Balloon Flight!',
+    'supportNext.title': "🎈 Supporter Edition now available!",
     'supportNext.text':
-      'Thank you so much for all your tremendous support, and for your many support T-shirt orders.<br>' +
-      'From now on, we are asking for support toward server and development costs ' +
-      'through purchases of the paid <b>Supporter Edition</b>, with flight areas from around the world. ' +
-      'The purchase page is coming soon.',
+      "Thank you so much for all your tremendous support, and for your many support T-shirt orders.<br>" +
+      "From now on, we are asking for support toward server and development costs " +
+      "through purchases of the paid <b>Supporter Edition</b>. " +
+      "It includes 16 flight areas in Poland, the UK, France, the USA, Brazil and Japan, " +
+      "plus the new Spectator Mode (one-time payment, valid for 1 year).",
+    'supportNext.buyBtn': "Supporter Edition — details & purchase",
+    'supportNext.buyUrl': "https://balloon-supporters-guest.rnogamigm.workers.dev/support/#en",
     'supportNext.instaBtn': 'Latest news on Instagram',
 
     'pibal.panelTitle': 'Pibal Observation Data',
@@ -635,12 +641,15 @@ const STR = {
       'sobre o terreno real de Krosno, a cidade-sede do Campeonato Mundial.',
     'support.instaBtn': 'Informações de doação no Instagram',
     // 2026-10-15 0:00(日本時間)以降に表示する応援欄(index.html の data-from)
-    'supportNext.title': '🎈 Apoie o Hot Air Balloon Flight!',
+    'supportNext.title': "🎈 Edição Apoiador já disponível!",
     'supportNext.text':
-      'Muito obrigado por todo o enorme apoio e pelos muitos pedidos de camisetas de apoio.<br>' +
-      'A partir de agora, pedimos apoio aos custos de servidor e desenvolvimento ' +
-      'por meio da compra da <b>Edição Apoiador</b> paga, com áreas de voo do mundo todo. ' +
-      'A página de compra estará disponível em breve.',
+      "Muito obrigado por todo o enorme apoio e pelos muitos pedidos de camisetas de apoio.<br>" +
+      "A partir de agora, pedimos apoio aos custos de servidor e desenvolvimento " +
+      "por meio da compra da <b>Edição Apoiador</b> paga. " +
+      "Ela inclui 16 áreas de voo na Polônia, Reino Unido, França, EUA, Brasil e Japão, " +
+      "além do novo Modo Espectador (pagamento único, válido por 1 ano).",
+    'supportNext.buyBtn': "Edição Apoiador — detalhes e compra",
+    'supportNext.buyUrl': "https://balloon-supporters-guest.rnogamigm.workers.dev/support/#en",
     'supportNext.instaBtn': 'Novidades no Instagram',
 
     'pibal.panelTitle': 'Dados de Sondagem (Pibal)',
@@ -870,12 +879,15 @@ const STR = {
       'nad prawdziwym terenem Krosna, miasta-gospodarza Mistrzostw Świata.',
     'support.instaBtn': 'Informacje o darowiznach na Instagramie',
     // 2026-10-15 0:00(日本時間)以降に表示する応援欄(index.html の data-from)
-    'supportNext.title': '🎈 Wesprzyj Hot Air Balloon Flight!',
+    'supportNext.title': "🎈 Wersja Supporter już dostępna!",
     'supportNext.text':
-      'Serdecznie dziękujemy za ogromne wsparcie oraz liczne zamówienia koszulek kibica.<br>' +
-      'Od teraz prosimy o wsparcie kosztów serwerów i rozwoju ' +
-      'poprzez zakup płatnej <b>wersji Supporter</b> z obszarami lotów z całego świata. ' +
-      'Strona zakupu pojawi się wkrótce.',
+      "Serdecznie dziękujemy za ogromne wsparcie oraz liczne zamówienia koszulek kibica.<br>" +
+      "Od teraz prosimy o wsparcie kosztów serwerów i rozwoju " +
+      "poprzez zakup płatnej <b>wersji Supporter</b>. " +
+      "Zawiera 16 obszarów lotów w Polsce, Wielkiej Brytanii, Francji, USA, Brazylii i Japonii " +
+      "oraz nowy tryb widza (jednorazowa płatność, ważna 1 rok).",
+    'supportNext.buyBtn': "Wersja Supporter — szczegóły i zakup",
+    'supportNext.buyUrl': "https://balloon-supporters-guest.rnogamigm.workers.dev/support/#en",
     'supportNext.instaBtn': 'Najnowsze informacje na Instagramie',
 
     'pibal.panelTitle': 'Dane Sondażu Pilotowego',
@@ -1105,12 +1117,15 @@ const STR = {
       'au-dessus du terrain réel de Krosno, ville hôte du Championnat du monde.',
     'support.instaBtn': 'Infos sur les dons sur Instagram',
     // 2026-10-15 0:00(日本時間)以降に表示する応援欄(index.html の data-from)
-    'supportNext.title': '🎈 Soutenez Hot Air Balloon Flight !',
+    'supportNext.title': "🎈 L'édition Supporter est disponible !",
     'supportNext.text':
-      'Merci infiniment pour vos encouragements et pour vos nombreuses commandes de T-shirts de soutien.<br>' +
-      'Désormais, nous vous proposons de soutenir les frais de serveur et de développement ' +
-      "en achetant l'<b>édition Supporter</b> payante, avec des zones de vol du monde entier. " +
-      "La page d'achat sera bientôt disponible.",
+      "Merci infiniment pour vos encouragements et pour vos nombreuses commandes de T-shirts de soutien.<br>" +
+      "Désormais, nous vous proposons de soutenir les frais de serveur et de développement " +
+      "en achetant l'<b>édition Supporter</b> payante. " +
+      "Elle comprend 16 zones de vol en Pologne, au Royaume-Uni, en France, aux États-Unis, au Brésil et au Japon, " +
+      "ainsi que le nouveau mode spectateur (paiement unique, valable 1 an).",
+    'supportNext.buyBtn': "Édition Supporter — détails et achat",
+    'supportNext.buyUrl': "https://balloon-supporters-guest.rnogamigm.workers.dev/support/#en",
     'supportNext.instaBtn': 'Actualités sur Instagram',
 
     'pibal.panelTitle': 'Données de sondage pibal',
@@ -1340,12 +1355,15 @@ const STR = {
       'über das echte Gelände von Krosno, der Gastgeberstadt der Weltmeisterschaft, fliegen kann.',
     'support.instaBtn': 'Spendeninfo auf Instagram',
     // 2026-10-15 0:00(日本時間)以降に表示する応援欄(index.html の data-from)
-    'supportNext.title': '🎈 Unterstütze Hot Air Balloon Flight!',
+    'supportNext.title': "🎈 Die Supporter-Edition ist da!",
     'supportNext.text':
-      'Vielen Dank für die großartige Unterstützung und die vielen Bestellungen von Fan-T-Shirts.<br>' +
-      'Ab jetzt bitten wir um Unterstützung der Server- und Entwicklungskosten ' +
-      'durch den Kauf der kostenpflichtigen <b>Supporter-Edition</b> mit Fluggebieten aus aller Welt. ' +
-      'Die Kaufseite folgt in Kürze.',
+      "Vielen Dank für die großartige Unterstützung und die vielen Bestellungen von Fan-T-Shirts.<br>" +
+      "Ab jetzt bitten wir um Unterstützung der Server- und Entwicklungskosten " +
+      "durch den Kauf der kostenpflichtigen <b>Supporter-Edition</b>. " +
+      "Sie enthält 16 Fluggebiete in Polen, Großbritannien, Frankreich, den USA, Brasilien und Japan " +
+      "sowie den neuen Zuschauermodus (Einmalzahlung, 1 Jahr gültig).",
+    'supportNext.buyBtn': "Supporter-Edition — Details & Kauf",
+    'supportNext.buyUrl': "https://balloon-supporters-guest.rnogamigm.workers.dev/support/#en",
     'supportNext.instaBtn': 'Neuigkeiten auf Instagram',
 
     'pibal.panelTitle': 'Pibal-Messdaten',
@@ -1575,12 +1593,15 @@ const STR = {
       'sobre el terreno real de Krosno, la ciudad anfitriona del Campeonato Mundial.',
     'support.instaBtn': 'Información sobre donaciones en Instagram',
     // 2026-10-15 0:00(日本時間)以降に表示する応援欄(index.html の data-from)
-    'supportNext.title': '🎈 ¡Apoya Hot Air Balloon Flight!',
+    'supportNext.title': "🎈 ¡Ya está disponible la edición Supporter!",
     'supportNext.text':
-      'Muchas gracias por todo el enorme apoyo recibido y por los numerosos pedidos de camisetas de apoyo.<br>' +
-      'A partir de ahora, pedimos apoyo para los costes de servidores y desarrollo ' +
-      'mediante la compra de la <b>edición Supporter</b> de pago, con zonas de vuelo de todo el mundo. ' +
-      'La página de compra estará disponible pronto.',
+      "Muchas gracias por todo el enorme apoyo recibido y por los numerosos pedidos de camisetas de apoyo.<br>" +
+      "A partir de ahora, pedimos apoyo para los costes de servidores y desarrollo " +
+      "mediante la compra de la <b>edición Supporter</b> de pago. " +
+      "Incluye 16 zonas de vuelo en Polonia, Reino Unido, Francia, EE. UU., Brasil y Japón, " +
+      "además del nuevo modo espectador (pago único, válido por 1 año).",
+    'supportNext.buyBtn': "Edición Supporter — detalles y compra",
+    'supportNext.buyUrl': "https://balloon-supporters-guest.rnogamigm.workers.dev/support/#en",
     'supportNext.instaBtn': 'Novedades en Instagram',
 
     'pibal.panelTitle': 'Datos de Sondeo Pibal',
